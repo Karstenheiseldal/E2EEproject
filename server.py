@@ -2,7 +2,11 @@ import socket
 import threading
 import createCommands
 from datetime import datetime
+from cryptography.fernet import Fernet
 
+# Same key as the client (ideally, share this securely)
+key = Fernet.generate_key()
+cipher = Fernet(key)
 
 HOST = str('127.0.0.1')
 PORT = int(5500)
@@ -23,10 +27,10 @@ print(f'Server listening on {HOST}:{PORT}')
 def handle_client(client, username):
     while True:
         try:
-            data = client.recv(1024)
-            if not data:
+            encryptedMessage = client.recv(1024)
+            if not encryptedMessage:
                 break
-            message = data.decode('utf-8')
+            message = cipher.decrypt(encryptedMessage).decode('utf-8')
             log(message, username)
             if message.startswith('/'):
                 message = message.lower()
@@ -39,8 +43,9 @@ def handle_client(client, username):
     remove(client, username)
 
 def broadcast(message):
+    encryptedMessage = cipher.encrypt(message.encode('utf-8'))
     for client in clients:
-        client.send(message.encode('utf-8'))
+        client.send(encryptedMessage)
 
 def remove(client, username):
     if client in clients:
