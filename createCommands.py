@@ -1,25 +1,25 @@
 def handle_command(client,message, clients, usernames):
     if message == 'count':
-        user_count(client, clients)
+        userCount(client, clients)
     elif message == 'help':
-        help_message(client)
+        helpMessage(client)
     elif message == 'users':
-        show_users(client, usernames)
+        showUsers(client, usernames)
     elif message == 'clear':
-        clear_chat(client)
+        clearChat(client)
     else:
         client.send(f"Invalid command.".encode('utf-8'))
 
-def user_count(client, clients):
+def userCount(client, clients):
     client.send(f"Number of users online: {len(clients)}".encode('utf-8'))
 
-def show_users(client, usernames):
+def showUsers(client, usernames):
     usr = ", ".join(usernames)
     client.send(f"Online users:\n{usr}".encode('utf-8'))
 
-def clear_chat(client):
+def clearChat(client):
     client.send(b'\033c')
 
-def help_message(client):
+def helpMessage(client):
     help_msg = b"Commands: \n/Count - for number of users in the chat\n/Users - for online users\n/Clear - for clearing chat\n"
     client.send(help_msg)
