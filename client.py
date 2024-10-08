@@ -1,49 +1,68 @@
 import socket
 import threading
-import sys
 from cryptography.fernet import Fernet
 
-# Generate a key for encryption/decryption
-# Note: For production, save this key securely
-key = Fernet.generate_key()
+# Pre-shared key for encryption/decryption (for simplicity here, both client and server know the key)
+key = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='
+print(key)
 cipher = Fernet(key)
 
-HOST = str('127.0.0.1')
-PORT = int(5500)
+HOST = '127.0.0.1'
+PORT = 5500
 
-if PORT < 0 or PORT > 65535 or not isinstance(PORT, int):
-    print("Port number must be between 0 and 65535")
-    exit()
-
-client = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((HOST, PORT))
 
+# Control flag for both threads
+isRunning = True
+
 def receive():
-    while True:
+    global isRunning
+    while isRunning:
         try:
             encryptedMessage = client.recv(1024)
-            if  encryptedMessage:
-                  # Decrypt message
+            if encryptedMessage:
                 decryptedMessage = cipher.decrypt(encryptedMessage).decode('utf-8')
-                print(decryptedMessage)
-            print(encryptedMessage)
-        except:
-            print("An error occurred!")
+                print ('Encrypted message: ', encryptedMessage)
+                print('Decrypted Message: ', decryptedMessage)
+            else:
+                print("Server has closed the connection.")
+                isRunning = False
+                client.close()
+                break
+        except Exception as e:
+            print(f"An error occurred in receive: {e}")
+            isRunning = False
             client.close()
             break
 
 def send():
+    global isRunning
     username = input("Enter your username: ")
-    client.send(cipher.encrypt(username.encode('utf-8')))
-    while True:
-        message = input('')
-        encryptedMessage = cipher.encrypt(message.encode('utf-8'))
-        client.send(encryptedMessage)
+    try:
+        # Ensure socket is open before sending
+        if isRunning:
+            client.send(cipher.encrypt(username.encode('utf-8')))
+        while isRunning:
+            message = input('')
+            if isRunning:  # Check if the connection is still active
+                encryptedMessage = cipher.encrypt(message.encode('utf-8'))
+                client.send(encryptedMessage)
+            else:
+                break
+    except OSError as e:
+        print(f"An error occurred in send: {e}")
+        isRunning = False
+    finally:
+        client.close()
 
+# Start the threads
+receiveThread = threading.Thread(target=receive)
+sendThread = threading.Thread(target=send)
 
+receiveThread.start()
+sendThread.start()
 
-receive_thread = threading.Thread(target=receive)
-receive_thread.start()
-
-send_thread = threading.Thread(target=send)
-send_thread.start()
+# Ensure both threads close properly
+receiveThread.join()
+sendThread.join()

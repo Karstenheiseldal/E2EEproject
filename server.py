@@ -1,24 +1,19 @@
 import socket
 import threading
-import createCommands
-from datetime import datetime
 from cryptography.fernet import Fernet
 
-# Same key as the client (ideally, share this securely)
-key = Fernet.generate_key()
+# Same key as the client (shared securely in production)
+key = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='
+print(key)
 cipher = Fernet(key)
 
-HOST = str('127.0.0.1')
-PORT = int(5500)
-
-if PORT < 0 or PORT > 65535 or not isinstance(PORT, int):
-    print("Port number must be between 0 and 65535")
-    exit()
+HOST = '127.0.0.1'
+PORT = 5500
 
 clients = []
 usernames = []
 
-server = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((HOST, PORT))
 server.listen()
 
@@ -27,19 +22,19 @@ print(f'Server listening on {HOST}:{PORT}')
 def handle_client(client, username):
     while True:
         try:
-            encryptedMessage = client.recv(1024)
-            if not encryptedMessage:
+            # Receive encrypted data
+            encryptedData = client.recv(1024)
+            if not encryptedData:
                 break
-            message = cipher.decrypt(encryptedMessage).decode('utf-8')
-            log(message, username)
-            if message.startswith('/'):
-                message = message.lower()
-                createCommands.handle_command(client, message[1:], clients, usernames)
-            else:
-                broadcast(f"{username}: {message}")
+            
+            # Decrypt message
+            message = cipher.decrypt(encryptedData).decode('utf-8')
+            print(f"{username}: {message}")
+            broadcast(f"{username}: {message}")
         except Exception as e:
             print(f"Error : {e}")
             break
+
     remove(client, username)
 
 def broadcast(message):
@@ -53,28 +48,23 @@ def remove(client, username):
     if username in usernames:
         usernames.remove(username)
 
-def log(message,username):
-    current_datetime = datetime.now()
-    current_time = current_datetime.strftime("%H:%M:%S")
-    try:
-        with open("server.log", "a") as f:
-            f.write(f"[{current_time}] - {username}: {message}\n")
-    except IOError as e:
-        print(f"An error has occured during logging: {e}")
-
 try:
     while True:
         client, address = server.accept()
-        client.send("Welcome!".encode('utf-8'))
-        username = client.recv(1024).decode('utf-8')
+        print(f'User connected from {address}')
+        
+        # Receive and decrypt username
+        encrypted_username = client.recv(1024)
+        username = cipher.decrypt(encrypted_username).decode('utf-8')
+        
         clients.append(client)
         usernames.append(username)
-
-        broadcast(f"{username} joined!")
-        print(f'User {username} connected from {address}')
-
-        client_handler = threading.Thread(target=handle_client, args=(client, username))
-        client_handler.start()
+        
+        broadcast(f"{username} has joined!")
+        
+        # Handle this client in a new thread
+        thread = threading.Thread(target=handle_client, args=(client, username))
+        thread.start()
 except KeyboardInterrupt:
     print("\nServer stopped.")
     server.close()
