@@ -1,5 +1,3 @@
-import os
-
 def handle_command(client,message, clients, usernames):
     if message == 'count':
         user_count(client, clients)

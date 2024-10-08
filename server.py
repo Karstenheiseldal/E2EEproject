@@ -1,6 +1,4 @@
-#!/usr/bin/python3
 import socket
-import sys
 import threading
 import createCommands
 from datetime import datetime
