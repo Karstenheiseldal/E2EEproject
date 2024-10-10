@@ -69,9 +69,9 @@ try:
             # Send acknowledgment to the client
             client.send(cipher.encrypt(f"Welcome, {username}!".encode('utf-8')))
             
-            clients.append(client)
-            usernames.append(username)
-            
+            clients.append(client) #Places the client object in the clients array.
+            usernames.append(username) #Same with usernames
+
             # Broadcast the join message to other clients
             broadcast(f"{username} has joined!", client)
             
