@@ -4,8 +4,14 @@
 Creating a simple messenger app in python. The messages will be encrypted, and we will try to implement end to end encryption with Signal protocol.
 
 ## Depedencies
-python 3.10.
-pip 24.2
+Python 3.10.
+
+Pip 24.2
+
+### Libraries
+Socket
+Threading
+Cryptography
 
 Remember to have Python in PATH.
 
