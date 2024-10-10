@@ -10,10 +10,18 @@ Pip 24.2
 
 ### Libraries
 Socket
+
 Threading
+
 Cryptography
 
-Remember to have Python in PATH.
+Unittest
+
+
+
+
+
+NB Remember to have Python in PATH and pip installed
 
 ## Naming Conventions
 For the sake of sanity, and so much more, lets keep these naming conventions when we are coding.
