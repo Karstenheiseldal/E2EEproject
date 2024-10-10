@@ -11,16 +11,11 @@ PORT = 5500
 #socket.SOCK_STREAM: Specifies the socket type as TCP, which is a connection-oriented, reliable, and ordered communication protocol.
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-#shuts down threads
-shutdownEvent = threading.Event()  # Event to signal threads to stop
+#shuts down threads. When threading.Event.is_set() then they both shut down.
+shutdownEvent = threading.Event()
 
-#set timer for
-client.settimeout(5) #The line client.settimeout(5) sets a timeout for the socket operations associated with client. 
-
-#Here’s what it does:
-
-#Specifies a maximum wait time of 5 seconds for blocking socket operations.
-#If any of these operations take longer than 5 seconds, the socket will raise a socket.timeout exception. 
+#sets a timeout for the socket operations associated with client. 
+client.settimeout(5)
 
 try:
     client.connect((HOST, PORT)) #Attempts to connect the client socket to the server at the specified HOST and PORT.
@@ -29,7 +24,10 @@ except socket.error as e: #Catches any socket-related errors that occur during t
     print(f"Could not connect to server: {e}")
     exit(1)  # Exit if the connection fails
 
-key = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='#Fernet key must be 32 url-safe base64-encoded bytes. Random key generated once from Fernet.generate_key. Just using the same key in the server and client for now.
+#Fernet key must be 32 url-safe base64-encoded bytes, therefore so long.
+#Random key generated once from Fernet.generate_key. Just using the same key in the server and client for now.
+key = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='
+
 cipher = Fernet(key) #Using a Fernet object as cypher to encrypt and decrypt messages.
 
 def receive(): #Recieve messages
@@ -40,18 +38,22 @@ def receive(): #Recieve messages
                 decryptedMessage = cipher.decrypt(encryptedMessage).decode('utf-8')
                 print ('Encrypted message: ', encryptedMessage)
                 print('Decrypted Message: ', decryptedMessage)
-            else:
+            else: #If encryptedMessage is empty (indicating the server has closed the connection), it prints a message, closes the socket, and exits the loop to stop listening.
                 print("Server has closed the connection.")
                 client.close()
                 break
 
-        except socket.timeout:
+        except socket.timeout: #If a timeout occurs (as set by client.settimeout(5)), it ignores the timeout, allowing the loop to continue without interruption.
             continue  # Ignore timeout and keep looping until connection is closed
 
         except Exception as e:
             print(f"An error occurred in receive: {e}")
             client.close
             break
+
+#This send function allows the client to send an initial username and then ongoing messages to the server, encrypting each one before transmission. 
+# 
+# Here’s a breakdown of how each part works:
 
 def send():
     username = input("Enter your username: ")
