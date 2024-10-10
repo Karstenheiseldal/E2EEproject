@@ -9,14 +9,14 @@ cipher = Fernet(key) # Creates an encryption and decryption tool using this key.
 HOST = '127.0.0.1' #Sets the IP address for the localhost which means the server and client are running on the same machine. In a real-world deployment it would say IP address
 PORT = 5500 # Specifies the port the server listens on. The client will connect to this same port to communicate with the server.
 
-clients = [] #Array of Clients
+clients = [] #Array of clients
 usernames = [] ##Array of usernames
 
 #Fixing the server object and make it listen
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((HOST, PORT))
 server.listen()
-print(f'Server listening on {HOST}:{PORT}')
+print(f'Server listening on {HOST}:{PORT} ... a little quiet here tho')
 
 #This function manages communication with a single connected client. 
 #It receives, decrypts, and broadcasts messages from this client to others, while handling disconnects and errors. 
@@ -58,7 +58,7 @@ try:
     while True:
         client, address = server.accept()
         print(f'User connected from {address}')
-        
+
         # Attempt to receive and decrypt the username
         encryptedUsername = client.recv(1024)
         if encryptedUsername:
@@ -66,11 +66,12 @@ try:
             username = cipher.decrypt(encryptedUsername).decode('utf-8')
             print(f"Username received and decrypted: {username}")
             
-            # Send acknowledgment to the client
-            client.send(cipher.encrypt(f"Welcome, {username}!".encode('utf-8')))
+            client.send(cipher.encrypt(f"Welcome, {username}!".encode('utf-8'))) # Send acknowledgment to the client
             
             clients.append(client) #Places the client object in the clients array.
             usernames.append(username) #Same with usernames
+            
+            print('list of usernames', usernames) #Debugging in case username is lost
 
             # Broadcast the join message to other clients
             broadcast(f"{username} has joined!", client)
