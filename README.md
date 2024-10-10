@@ -1,7 +1,13 @@
 # E2EEproject
 
 ## Introduction
-Creating a simple messenger app in python. The messages will be encrypted, and we will try to implement end to end encryption with Signal protocol. 
+Creating a simple messenger app in python. The messages will be encrypted, and we will try to implement end to end encryption with Signal protocol.
+
+## Depedencies
+python 3.10.
+pip 24.2
+
+Remember to have Python in PATH.
 
 ## Naming Conventions
 For the sake of sanity, and so much more, lets keep these naming conventions when we are coding.
