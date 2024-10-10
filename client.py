@@ -52,24 +52,22 @@ def receive(): #Recieve messages
             break
 
 #This send function allows the client to send an initial username and then ongoing messages to the server, encrypting each one before transmission. 
-# 
-# Here’s a breakdown of how each part works:
 
 def send():
-    username = input("Enter your username: ")
+    username = input("Enter your username: ") #Prompts the user to enter their username, which will be sent to the server as the initial identification.
     try:
-        if not shutdownEvent.is_set():
-            encrypted_username = cipher.encrypt(username.encode('utf-8'))
-            client.send(encrypted_username)
+        if not shutdownEvent.is_set(): #Checks if the shutdownEvent is triggered, meaning the connection should close. If not, the function proceeds.
+            encrypted_username = cipher.encrypt(username.encode('utf-8')) #Encrypts the username, converting it from plaintext to an encrypted byte form.
+            client.send(encrypted_username)# Sends the encrypted username to the server.
             print("Username sent to server.")
             print("Username sent. Type messages to send to the server:")
         
-        while not shutdownEvent.is_set():
-            message = input('')
-            if shutdownEvent.is_set():  # Check shutdown event after each input
+        while not shutdownEvent.is_set(): #: Starts a loop to continuously accept user input messages until the shutdownEvent is triggered.
+            message = input('') # Collects a new message from the user each time
+            if shutdownEvent.is_set():  #After each input, the function checks if shutdownEvent was set (possibly by another function or error). If so, it breaks out of the loop.
                 break
-            encryptedMessage = cipher.encrypt(message.encode('utf-8'))
-            client.send(encryptedMessage)
+            encryptedMessage = cipher.encrypt(message.encode('utf-8')) #Encrypts message
+            client.send(encryptedMessage) #Send using the socket object.
     except socket.timeout:
         print("Socket operation timed out.")
     except OSError as e:
