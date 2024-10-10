@@ -1,0 +1,47 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment directories
+env/
+venv/
+.venv/
+
+
+# PyInstaller
+# Usually contains the build artifacts and the compiled binaries
+/build/
+*.spec
+
+# log and temporary files
+*.log
+*.tmp
+
+# IDE files (like VSCode or PyCharm)
+.vscode/
+.idea/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Environment files (Python and others)
+.env
+.env.local
+*.env.*
+
+# Test coverage and profiler data
+htmlcov/
+.coverage
+.tox/
+.cache/
+.pytest_cache/
+.cache/
+
+# Dependency directories
+pip-log.txt
+pip-delete-this-directory.txt
+node_modules/
+
+
