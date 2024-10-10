@@ -12,15 +12,40 @@ PORT = 5500 # Specifies the port the server listens on. The client will connect 
 clients = [] #Array of clients
 usernames = [] ##Array of usernames
 
-#Fixing the server object and make it listen
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((HOST, PORT))
-server.listen()
-print(f'Server listening on {HOST}:{PORT} ... a little quiet here tho')
+# Start server function
+def startServer():
+    global server
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((HOST, PORT))
+    server.listen()
+    print(f"Server listening on {HOST}:{PORT}...")
 
-#This function manages communication with a single connected client. 
+    while True:
+        client, address = server.accept()
+        print(f"User connected from {address}")
+
+        # Handle username and add client to lists
+        encryptedUsername = client.recv(1024)
+        if encryptedUsername:
+            username = cipher.decrypt(encryptedUsername).decode('utf-8')
+            client.send(cipher.encrypt(f"Welcome, {username}!".encode('utf-8')))
+            
+            clients.append(client)
+            usernames.append(username)
+            print('list of usernames', usernames)
+
+            # Broadcast join message and start handling client in new thread
+            broadcast(f"{username} has joined!", client)
+            thread = threading.Thread(target=handleClient, args=(client, username))
+            thread.start()
+        else:
+            print("No username received, closing connection.")
+            client.close()
+
+
+#The following function manages communication with a single connected client. 
 #It receives, decrypts, and broadcasts messages from this client to others, while handling disconnects and errors. 
-def handle_client(client, username): 
+def handleClient(client, username): 
     while True:
         try:
             encryptedData = client.recv(1024) #Receives up to 1024 bytes of encrypted data from the client.
@@ -45,7 +70,8 @@ def broadcast(message, sender_client=None):
             except Exception as e:
                 print(f"Failed to send message to a client: {e}")
                 remove(client)  # Remove client if it cannot receive messages
-#Function to remove clients. Uses socket 
+
+#Function to remove client and username from respective array and close the socket object.
 def remove(client, username):
     if client in clients:
         clients.remove(client)
@@ -54,34 +80,10 @@ def remove(client, username):
         usernames.remove(username)
     if username:
         broadcast(f"{username} has left the chat.")
-try:
-    while True:
-        client, address = server.accept()
-        print(f'User connected from {address}')
 
-        # Attempt to receive and decrypt the username
-        encryptedUsername = client.recv(1024)
-        if encryptedUsername:
-            print("Received encrypted username:", encryptedUsername)  # Debugging statement
-            username = cipher.decrypt(encryptedUsername).decode('utf-8')
-            print(f"Username received and decrypted: {username}")
-            
-            client.send(cipher.encrypt(f"Welcome, {username}!".encode('utf-8'))) # Send acknowledgment to the client
-            
-            clients.append(client) #Places the client object in the clients array.
-            usernames.append(username) #Same with usernames
-            
-            print('list of usernames', usernames) #Debugging in case username is lost
-
-            # Broadcast the join message to other clients
-            broadcast(f"{username} has joined!", client)
-            
-            # Handle this client in a new thread
-            thread = threading.Thread(target=handle_client, args=(client, username))
-            thread.start()
-        else:
-            print("No username received, closing connection.")
-            client.close()
-except KeyboardInterrupt:
-    print("\nServer stopped.")
-    server.close()
+if __name__ == "__main__":
+    try:
+        startServer()
+    except KeyboardInterrupt:
+        print("\nServer stopped.")
+        server.close()
