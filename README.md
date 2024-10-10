@@ -1,7 +1,7 @@
 # End-to-End Encryption Project
 
 ## Introduction
-Creating a simple messenger app in python. The messages will be encrypted, and we will try to implement end to end encryption with Signal protocol using extended triple diffie-helman (X3DH) and double ratchet algorithm.
+Creating a simple messenger app in python for demonstrative purposes. We will try to implement end to end encryption with Signal protocol using extended triple diffie-helman (X3DH) and double ratchet algorithm.
 
 ## Depedencies
 Python 3.10.
