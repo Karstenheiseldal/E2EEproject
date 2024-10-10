@@ -19,24 +19,24 @@ client.settimeout(5) #The line client.settimeout(5) sets a timeout for the socke
 
 #Here’s what it does:
 
-#Specifies a maximum wait time of 5 seconds for blocking socket operations (such as connect, recieve, send, etc.).
+#Specifies a maximum wait time of 5 seconds for blocking socket operations.
 #If any of these operations take longer than 5 seconds, the socket will raise a socket.timeout exception. 
 
 try:
-    client.connect((HOST, PORT)) #Attempts to connect the client socket to the server at the specified HOST (IP address or hostname) and PORT (port number).
+    client.connect((HOST, PORT)) #Attempts to connect the client socket to the server at the specified HOST and PORT.
     print("Connected to the server successfully.")
 except socket.error as e: #Catches any socket-related errors that occur during the connection attempt.
     print(f"Could not connect to server: {e}")
     exit(1)  # Exit if the connection fails
 
-key = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='#Fernet key must be 32 url-safe base64-encoded bytes. Random key generated once from Fernet.generate_key
-cipher = Fernet(key) #Using fernet as cypher to encrypt and decrypt messages.
+key = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='#Fernet key must be 32 url-safe base64-encoded bytes. Random key generated once from Fernet.generate_key. Just using the same key in the server and client for now.
+cipher = Fernet(key) #Using a Fernet object as cypher to encrypt and decrypt messages.
 
-def receive():
-    while True:
+def receive(): #Recieve messages
+    while True: #Creates an infinite loop to keep listening for messages until the connection closes.
         try:
-            encryptedMessage = client.recv(1024)
-            if encryptedMessage:
+            encryptedMessage = client.recv(1024) #Receives up to 1024 bytes of data from the server. If there’s data, it’s stored in the encryptedMessage variable.
+            if encryptedMessage: #Checks if data was received. If it was, it attempts to decrypt it using the cipher and  storing it in decryptedMessage variable.
                 decryptedMessage = cipher.decrypt(encryptedMessage).decode('utf-8')
                 print ('Encrypted message: ', encryptedMessage)
                 print('Decrypted Message: ', decryptedMessage)
