@@ -10,7 +10,9 @@ HOST = '127.0.0.1' #Sets the IP address for the localhost which means the server
 PORT = 5500 # Specifies the port the server listens on. The client will connect to this same port to communicate with the server.
 
 clients = [] #Array of clients
-usernames = [] ##Array of usernames
+usernames = [] #Array of usernames
+
+publicKeys = {}
 
 # Start server function
 def startServer():
@@ -48,28 +50,34 @@ def startServer():
 def handleClient(client, username): 
     while True:
         try:
-            encryptedData = client.recv(1024) #Receives up to 1024 bytes of encrypted data from the client.
+            # Receive encrypted data from the client
+            encryptedData = client.recv(1024)
             if not encryptedData: #: If encryptedData is empty (indicating the client has disconnected), it logs a disconnection message, exits the loop, and stops listening for messages.
                 print(f"{username} has disconnected.")
                 break
+            
             message = cipher.decrypt(encryptedData).decode('utf-8') #Decrypts the received data using cipher.decrypt(...) and decodes it from UTF-8.
             print(f"Received message from {username}: {message}")
-            broadcast(f"{username}: {message}", client) # send the message to all other connected clients, allowing everyone to see it.
+            broadcast(f"{message}", client) # send the message to all other connected clients, allowing everyone to see it.
+        
         except Exception as e:
             print(f"Error : {e}")
             break
     remove(client, username) #After exiting the loop, remove(client, username) is called to remove the client from the server’s records
 
-def broadcast(message, sender_client=None):
+def broadcast(message, senderClient=None):
     encryptedMessage = cipher.encrypt(message.encode('utf-8'))
     for client in clients:
-        if client != sender_client:  # Avoid echoing the message back to the sender
+        if client != senderClient:  # Avoid echoing the message back to the sender
             try:
                 client.send(encryptedMessage)
-                print(f"Broadcasting message to client: {message}")
+                print(f"Broadcasting message: {message}")
             except Exception as e:
                 print(f"Failed to send message to a client: {e}")
                 remove(client)  # Remove client if it cannot receive messages
+
+
+
 
 #Function to remove client and username from respective array and close the socket object.
 def remove(client, username):

@@ -38,8 +38,9 @@ class TestMessenger(unittest.TestCase):
     def testMessageEncryptionDecryption(self):
         # Test encryption and decryption
         message = "Hello, World!"
-        encryptedMessage = cipher.encrypt(message.encode())
-        decryptedMessage = cipher.decrypt(encryptedMessage)
+        encryptedMessage = cipher.encrypt(message.encode('utf-8'))
+        decryptedMessage = cipher.decrypt(encryptedMessage).decode('utf-8')
+        self.assertEquals(decryptedMessage, message)
 
     def testBroadcastMessage(self):
         # Test message broadcasting functionality
@@ -54,15 +55,22 @@ class TestMessenger(unittest.TestCase):
         self.sendUsername(client2, "Client 2")
 
         client2.recv(1024)  # Read and discard the "Welcome, Client 2!" message
+        client1.recv(1024)  
 
         # Send a message from client1 and check if client2 receives it
-        message = "Hello from Client 1"
-        encryptedMessage = cipher.encrypt(message.encode())
-        client1.sendall(encryptedMessage)
+        message1 = "Hello from Client 1"
+        message2 = "Hello from Client 2"
+        encryptedMessage1 = cipher.encrypt(message1.encode())
+        client1.sendall(encryptedMessage1)
+        receivedMessage1 = cipher.decrypt(client2.recv(1024)).decode()
+        self.assertEqual(receivedMessage1, "Hello from Client 1")
 
-        receivedMessage = cipher.decrypt(client2.recv(1024)).decode()
-        self.assertEqual(receivedMessage, "Client 1: Hello from Client 1")
+        encryptedMessage2 = cipher.encrypt(message2.encode())
+        client2.sendall(encryptedMessage2)
 
+        receivedMessage2 = cipher.decrypt(client1.recv(1024)).decode()
+        self.assertEqual(receivedMessage2, "Hello from Client 2")
+        
         client1.close()
         client2.close()
 
