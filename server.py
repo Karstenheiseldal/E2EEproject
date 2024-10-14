@@ -56,9 +56,8 @@ def handleClient(client, username):
                 print(f"{username} has disconnected.")
                 break
             
-            message = cipher.decrypt(encryptedData).decode('utf-8') #Decrypts the received data using cipher.decrypt(...) and decodes it from UTF-8.
-            print(f"Received message from {username}: {message}")
-            broadcast(f"{message}", client) # send the message to all other connected clients, allowing everyone to see it.
+            print(encryptedData)
+            broadcast(f"{encryptedData}", client) # send the message to all other connected clients, allowing everyone to see it.
         
         except Exception as e:
             print(f"Error : {e}")
@@ -66,18 +65,14 @@ def handleClient(client, username):
     remove(client, username) #After exiting the loop, remove(client, username) is called to remove the client from the server’s records
 
 def broadcast(message, senderClient=None):
-    encryptedMessage = cipher.encrypt(message.encode('utf-8'))
     for client in clients:
         if client != senderClient:  # Avoid echoing the message back to the sender
             try:
-                client.send(encryptedMessage)
+                client.send(message)
                 print(f"Broadcasting message: {message}")
             except Exception as e:
                 print(f"Failed to send message to a client: {e}")
                 remove(client)  # Remove client if it cannot receive messages
-
-
-
 
 #Function to remove client and username from respective array and close the socket object.
 def remove(client, username):
