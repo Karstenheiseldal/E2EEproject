@@ -40,7 +40,7 @@ class TestMessenger(unittest.TestCase):
         message = "Hello, World!"
         encryptedMessage = cipher.encrypt(message.encode('utf-8'))
         decryptedMessage = cipher.decrypt(encryptedMessage).decode('utf-8')
-        self.assertEquals(decryptedMessage, message)
+        self.assertEqual(decryptedMessage, message)
 
     def testBroadcastMessage(self):
         # Test message broadcasting functionality
@@ -58,18 +58,18 @@ class TestMessenger(unittest.TestCase):
         client1.recv(1024)  
 
         # Send a message from client1 and check if client2 receives it
-        message1 = "Hello from Client 1"
-        message2 = "Hello from Client 2"
+        message1 = "Client 1 has joined!"
+        message2 = "Client 2 has joined!"
         encryptedMessage1 = cipher.encrypt(message1.encode())
         client1.sendall(encryptedMessage1)
         receivedMessage1 = cipher.decrypt(client2.recv(1024)).decode()
-        self.assertEqual(receivedMessage1, "Hello from Client 1")
+        self.assertEqual(receivedMessage1, "Client 1 has joined!")
 
         encryptedMessage2 = cipher.encrypt(message2.encode())
         client2.sendall(encryptedMessage2)
 
         receivedMessage2 = cipher.decrypt(client1.recv(1024)).decode()
-        self.assertEqual(receivedMessage2, "Hello from Client 2")
+        self.assertEqual(receivedMessage2, "Client 2 has joined!")
         
         client1.close()
         client2.close()
