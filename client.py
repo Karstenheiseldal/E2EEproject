@@ -65,6 +65,7 @@ def encryptUsername(username):
 def sendUsername(username):
     encryptedUsername = encryptUsername(username)
     client.send(encryptedUsername)
+
 """
     This function is for sending a message.
     Also it sets the username for the user then sending its encrypted username to the server.
