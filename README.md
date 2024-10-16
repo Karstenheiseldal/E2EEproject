@@ -4,25 +4,25 @@
 Creating a simple messenger app in python for demonstrative purposes. We will try to implement end to end encryption with Signal protocol using extended triple diffie-helman (X3DH) and double ratchet algorithm.
 
 ## Depedencies
-Python 3.10.
-
+Python 3.10.x \
 Pip 24.2
 
 ### Libraries
-Socket
-
-Threading
-
-Cryptography
-
-Unittest
-
-
-
-
+In requirements.txt
 
 NB Remember to have Python in PATH and pip installed
 
+## How to run
+```
+   git clone <project's url>
+   cd to the project's directory
+   Create a .venv / use your own interpreter
+   pip install -r path/to/requirements.txt
+   First start the server:
+   python server.py
+   Then start 1 or more clients:
+   python client.py
+```
 ## Naming Conventions
 For the sake of sanity, and so much more, lets keep these naming conventions when we are coding.
 

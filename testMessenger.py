@@ -49,14 +49,13 @@ class TestMessenger(unittest.TestCase):
         encryptedUsername1 = cipher.encrypt(username1.encode('utf-8'))
         encryptedUsername2 = cipher.encrypt(username2.encode('utf-8'))
 
-
         client1.connect((HOST, PORT))
         client2.connect((HOST, PORT))
         
         # Send usernames for both clients
         client1.sendall(encryptedUsername1)
         client2.sendall(encryptedUsername2)
-      
+
         # Allow server to process and broadcast the join messages
         time.sleep(1)
 
@@ -79,10 +78,9 @@ class TestMessenger(unittest.TestCase):
         client2.close()
 
     def testClientReceiveMessage(self):
-        
         username1 = 'hey bababa'
         encryptedUsername1 = cipher.encrypt(username1.encode('utf-8'))
-       
+
         # Test if client can receive messages from the server
         clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         clientSocket.connect((HOST, PORT))
@@ -105,7 +103,6 @@ class TestMessenger(unittest.TestCase):
             client.close()
         server.serverObject.close()  # Close the server socket
         cls.serverThread.join()
-
 
 if __name__ == "__main__":
     unittest.main()

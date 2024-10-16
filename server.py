@@ -3,14 +3,14 @@ import threading
 from cryptography.fernet import Fernet
 
 #  Sets up a cryptographic key and a cipher for encrypting and decrypting messages, as well as defining the server's address and port.
-key = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='
-cipher = Fernet(key) # Creates an encryption and decryption tool using this key. For now, the same as client.
+KEY = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='
+cipher = Fernet(KEY) # Creates an encryption and decryption tool using this key. For now, the same as client.
 
-HOST = '127.0.0.1' #Sets the IP address for the localhost which means the server and client are running on the same machine. In a real-world deployment it would say IP address
+HOST = '127.0.0.1' # Sets the IP address for the localhost which means the server and client are running on the same machine. In a real-world deployment it would say IP address
 PORT = 5500 # Specifies the port the server listens on. The client will connect to this same port to communicate with the server.
 
-clients = [] #Array of clients
-encryptedUsernames = [] #Array of usernames
+clients = [] # Array of clients
+encryptedUsernames = [] # Array of usernames
 
 publicKeys = {}
 
@@ -21,7 +21,7 @@ def startServer():
     serverObject.bind((HOST, PORT))
     serverObject.listen()
     print(f"Server listening on {HOST}:{PORT}... pretty quiet")
-   
+
     while True:
         client, address = serverObject.accept()
         print(f"User connected from {address}")
@@ -38,8 +38,8 @@ def startServer():
             client.close()
 
 
-#The following function manages communication with a single connected client. 
-#It receives, decrypts, and broadcasts messages from this client to others, while handling disconnects and errors. 
+# The following function manages communication with a single connected client. 
+# It receives, decrypts, and broadcasts messages from this client to others, while handling disconnects and errors. 
 def handleClient(client, encryptedUsername): 
     while True:
         try:
