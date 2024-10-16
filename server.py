@@ -39,7 +39,7 @@ def startServer():
 
 
 # The following function manages communication with a single connected client. 
-# It receives, decrypts, and broadcasts messages from this client to others, while handling disconnects and errors. 
+# It receives, decrypts, and forwards messages from this client to others, while handling disconnects and errors. 
 def handleClient(client, encryptedUsername): 
     while True:
         try:
@@ -50,15 +50,15 @@ def handleClient(client, encryptedUsername):
                 break
             
             print(f"Encrypted data received from {encryptedUsername}: {encryptedData}")
-            broadcast(encryptedData, client)  # Broadcast as bytes, no conversion
+            forwardMessage(encryptedData, client)  # Forwards as bytes, no conversion
             
         except Exception as e:
             print(f"Error : {e}")
             break
     remove(client, encryptedUsername)
     
-def broadcast(encryptedMessage: bytes, senderClient=None):
-    print("Broadcasting message")  # Debug statement
+def forwardMessage(encryptedMessage: bytes, senderClient=None):
+    print("ForwardingMessage message")  # Debug statement
     for client in clients:
         if client != senderClient:  # Avoid echoing the message back to the sender
             try:
@@ -74,9 +74,9 @@ def remove(client, encryptedUsername):
     if encryptedUsername in encryptedUsernames:
         encryptedUsernames.remove(encryptedUsername)
     
-    # Encrypt and broadcast the leave message to ensure it’s bytes
+    # Encrypt and forward the leave message to ensure it’s bytes
     leave_message = cipher.encrypt(f"{encryptedUsername} has left the chat.".encode('utf-8'))
-    broadcast(leave_message)
+    forwardMessage(leave_message)
 
 if __name__ == "__main__":
     try:
