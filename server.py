@@ -10,35 +10,28 @@ HOST = '127.0.0.1' #Sets the IP address for the localhost which means the server
 PORT = 5500 # Specifies the port the server listens on. The client will connect to this same port to communicate with the server.
 
 clients = [] #Array of clients
-usernames = [] #Array of usernames
+encryptedUsernames = [] #Array of usernames
 
 publicKeys = {}
 
 # Start server function
 def startServer():
-    global server
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((HOST, PORT))
-    server.listen()
-    print(f"Server listening on {HOST}:{PORT}...")
-
+    global serverObject
+    serverObject = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    serverObject.bind((HOST, PORT))
+    serverObject.listen()
+    print(f"Server listening on {HOST}:{PORT}... pretty quiet")
+   
     while True:
-        client, address = server.accept()
+        client, address = serverObject.accept()
         print(f"User connected from {address}")
-
+        print(f"Participants: {len(clients)+1}")
         # Handle username and add client to lists
+        clients.append(client)
         encryptedUsername = client.recv(1024)
         if encryptedUsername:
-            username = cipher.decrypt(encryptedUsername).decode('utf-8')
-            client.send(cipher.encrypt(f"Welcome, {username}!".encode('utf-8')))
-            
-            clients.append(client)
-            usernames.append(username)
-            print('list of usernames', usernames)
-
-            # Broadcast join message and start handling client in new thread
-            broadcast(f"{username} has joined!", client)
-            thread = threading.Thread(target=handleClient, args=(client, username))
+            encryptedUsernames.append(encryptedUsername)
+            thread = threading.Thread(target=handleClient, args=(client, encryptedUsername))
             thread.start()
         else:
             print("No username received, closing connection.")
@@ -47,46 +40,47 @@ def startServer():
 
 #The following function manages communication with a single connected client. 
 #It receives, decrypts, and broadcasts messages from this client to others, while handling disconnects and errors. 
-def handleClient(client, username): 
+def handleClient(client, encryptedUsername): 
     while True:
         try:
             # Receive encrypted data from the client
             encryptedData = client.recv(1024)
-            if not encryptedData: #: If encryptedData is empty (indicating the client has disconnected), it logs a disconnection message, exits the loop, and stops listening for messages.
-                print(f"{username} has disconnected.")
+            if not encryptedData:  # Client disconnected
+                print(f"{encryptedUsername} has disconnected.")
                 break
             
-            print(encryptedData)
-            broadcast(f"{encryptedData}", client) # send the message to all other connected clients, allowing everyone to see it.
-        
+            print(f"Encrypted data received from {encryptedUsername}: {encryptedData}")
+            broadcast(encryptedData, client)  # Broadcast as bytes, no conversion
+            
         except Exception as e:
             print(f"Error : {e}")
             break
-    remove(client, username) #After exiting the loop, remove(client, username) is called to remove the client from the server’s records
-
-def broadcast(message, senderClient=None):
+    remove(client, encryptedUsername)
+    
+def broadcast(encryptedMessage: bytes, senderClient=None):
+    print("Broadcasting message")  # Debug statement
     for client in clients:
         if client != senderClient:  # Avoid echoing the message back to the sender
             try:
-                client.send(message)
-                print(f"Broadcasting message: {message}")
+                client.send(encryptedMessage)  # Directly send the encrypted message as bytes
             except Exception as e:
                 print(f"Failed to send message to a client: {e}")
-                remove(client)  # Remove client if it cannot receive messages
+                remove(client, encryptedMessage(client))
 
-#Function to remove client and username from respective array and close the socket object.
-def remove(client, username):
+def remove(client, encryptedUsername):
     if client in clients:
         clients.remove(client)
         client.close()
-    if username in usernames:
-        usernames.remove(username)
-    if username:
-        broadcast(f"{username} has left the chat.")
+    if encryptedUsername in encryptedUsernames:
+        encryptedUsernames.remove(encryptedUsername)
+    
+    # Encrypt and broadcast the leave message to ensure it’s bytes
+    leave_message = cipher.encrypt(f"{encryptedUsername} has left the chat.".encode('utf-8'))
+    broadcast(leave_message)
 
 if __name__ == "__main__":
     try:
         startServer()
     except KeyboardInterrupt:
         print("\nServer stopped.")
-        server.close()
+        serverObject.close()

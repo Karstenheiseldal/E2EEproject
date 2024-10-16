@@ -37,7 +37,7 @@ def receive(): #Recieve messages
             if encryptedMessage: #Checks if data was received. If it was, it attempts to decrypt it using the cipher and  storing it in decryptedMessage variable.
                 decryptedMessage = cipher.decrypt(encryptedMessage).decode('utf-8')
                 print ('Encrypted message: ', encryptedMessage)
-                print('Decrypted Message: ', decryptedMessage)
+                print(decryptedMessage)
             else: #If encryptedMessage is empty (indicating the server has closed the connection), it prints a message, closes the socket, and exits the loop to stop listening.
                 print("Server has closed the connection.")
                 client.close()
@@ -53,20 +53,29 @@ def receive(): #Recieve messages
 
 #This 'send' function allows the client to send an initial username and then ongoing messages to the server, encrypting each one before transmission. 
 
+def encryptUsername(username):
+    encryptedUsername = cipher.encrypt(username.encode('utf-8' ))
+    return encryptedUsername
+
+def sendUsername(username):
+    encryptedUsername = encryptUsername(username)
+    client.send(encryptedUsername)
+
 def send():
     username = input("Enter your username: ") #Prompts the user to enter their username, which will be sent to the server as the initial identification.
     try:
         if not shutdownEvent.is_set(): #Checks if the shutdownEvent is triggered, meaning the connection should close. If not, the function proceeds.
-            encryptedUsername = cipher.encrypt(username.encode('utf-8')) #Encrypts the username, converting it from plaintext to an encrypted byte form.
-            client.send(encryptedUsername)# Sends the encrypted username to the server.
+             #Encrypts the username, converting it from plaintext to an encrypted byte form.
+            sendUsername(username)
             print("Your username is sent to server.")
             print("Type a message in the command line to send a message to the server:")
         
         while not shutdownEvent.is_set(): #: Starts a loop to continuously accept user input messages until the shutdownEvent is triggered.
             message = input('') # Collects a new message from the user each time
+            fullMessage = f"[{username}]: {message}"
             if shutdownEvent.is_set():  #After each input, the function checks if shutdownEvent was set (possibly by another function or error). If so, it breaks out of the loop.
                 break
-            encryptedMessage = cipher.encrypt(message.encode('utf-8')) #Encrypts message
+            encryptedMessage = cipher.encrypt(fullMessage.encode('utf-8')) #Encrypts message
             client.send(encryptedMessage) #Send using the socket object.
     except socket.timeout:
         print("Socket operation timed out.")

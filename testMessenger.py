@@ -2,7 +2,7 @@ import unittest
 import socket
 import threading
 import time
-from server import startServer, clients  # Import startServer and clients list
+import server
 from cryptography.fernet import Fernet
 
 # Constants for testing
@@ -11,33 +11,30 @@ PORT = 5500
 KEY = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='
 cipher = Fernet(KEY)
 
-
 class TestMessenger(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         # Start the server in a separate thread
-        cls.server_thread = threading.Thread(target=startServer)  # Correct target syntax
-        cls.server_thread.daemon = True
-        cls.server_thread.start()
-        time.sleep(1)  # Add delay to ensure server starts before tests run
-
-    def sendUsername(self, clientSocket, username="test user"):
-        # Encrypt and send username
-        encryptedUsername = cipher.encrypt(username.encode())
-        clientSocket.sendall(encryptedUsername)
+        cls.serverThread = threading.Thread(target=server.startServer)
+        cls.serverThread.daemon = True
+        cls.serverThread.start()
+        time.sleep(1)  # Ensure server is ready before tests start
     
     def testClientConnection(self):
         # Test if the client can connect to the server and send a username
         clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         clientSocket.connect((HOST, PORT))
-        self.sendUsername(clientSocket)
+        testUsername = 'TestUserName'
+        encryptedUsername = cipher.encrypt(testUsername.encode('UTF-8'))
+        clientSocket.send(encryptedUsername)
         self.assertTrue(clientSocket)
+        print('Success')
         clientSocket.close()
 
     def testMessageEncryptionDecryption(self):
         # Test encryption and decryption
-        message = "Hello, World!"
+        message = "HelloWorld!"
         encryptedMessage = cipher.encrypt(message.encode('utf-8'))
         decryptedMessage = cipher.decrypt(encryptedMessage).decode('utf-8')
         self.assertEqual(decryptedMessage, message)
@@ -47,41 +44,52 @@ class TestMessenger(unittest.TestCase):
         client1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+        username1 = 'hey bababa'
+        username2 = 'hey hal'
+        encryptedUsername1 = cipher.encrypt(username1.encode('utf-8'))
+        encryptedUsername2 = cipher.encrypt(username2.encode('utf-8'))
+
+
         client1.connect((HOST, PORT))
         client2.connect((HOST, PORT))
         
         # Send usernames for both clients
-        self.sendUsername(client1, "Client 1")
-        self.sendUsername(client2, "Client 2")
+        client1.sendall(encryptedUsername1)
+        client2.sendall(encryptedUsername2)
+      
+        # Allow server to process and broadcast the join messages
+        time.sleep(1)
 
-        client2.recv(1024)  # Read and discard the "Welcome, Client 2!" message
-        client1.recv(1024)  
-
-        # Send a message from client1 and check if client2 receives it
-        message1 = "Client 1 has joined!"
-        message2 = "Client 2 has joined!"
+        # Client1 sends a message, and we check if Client2 receives it
+        message1 = "HelloFromClient1"
         encryptedMessage1 = cipher.encrypt(message1.encode())
         client1.sendall(encryptedMessage1)
         receivedMessage1 = cipher.decrypt(client2.recv(1024)).decode()
-        self.assertEqual(receivedMessage1, "Client 1 has joined!")
-
+        self.assertEqual(receivedMessage1, message1)
+        client1.recv(1024)
+        # Client2 sends a message, and we check if Client1 receives it
+        message2 = "HelloFromClient2"
         encryptedMessage2 = cipher.encrypt(message2.encode())
         client2.sendall(encryptedMessage2)
 
         receivedMessage2 = cipher.decrypt(client1.recv(1024)).decode()
-        self.assertEqual(receivedMessage2, "Client 2 has joined!")
+        self.assertEqual(receivedMessage2, message2)
         
         client1.close()
         client2.close()
 
     def testClientReceiveMessage(self):
+        
+        username1 = 'hey bababa'
+        encryptedUsername1 = cipher.encrypt(username1.encode('utf-8'))
+       
         # Test if client can receive messages from the server
         clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         clientSocket.connect((HOST, PORT))
-        self.sendUsername(clientSocket)
-
+        clientSocket.sendall(encryptedUsername1)
+        
         # Simulate a message broadcast by the server
-        broadcastMessage = "Welcome, test user!"
+        broadcastMessage = "WelcomeTestUser!"
         encryptedBroadcast = cipher.encrypt(broadcastMessage.encode())
         clientSocket.sendall(encryptedBroadcast)
 
@@ -93,9 +101,11 @@ class TestMessenger(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         # Cleanup server and any connections if necessary
-        for client in clients:
+        for client in server.clients:
             client.close()
-       
+        server.serverObject.close()  # Close the server socket
+        cls.serverThread.join()
+
 
 if __name__ == "__main__":
     unittest.main()
