@@ -77,26 +77,6 @@ class TestMessenger(unittest.TestCase):
         for client in server.clients:
             client.close()
         server.serverObject.close()  # Close the server socket
-"""
-# Doesn't work due to the fact that the server can't communicate, only the clients can.
-    def testBroadCastMessage(self):
-        username1 = 'hey bababa'
-        encryptedUsername1 = cipher.encrypt(username1.encode('utf-8'))
-
-        # Test if client can receive messages from the server
-        clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        clientSocket.connect((HOST, PORT))
-        clientSocket.sendall(encryptedUsername1)
-        
-        # Simulate a message broadcast by the server
-        broadcastMessage = "WelcomeTestUser!"
-        encryptedBroadcast = cipher.encrypt(broadcastMessage.encode())
-        clientSocket.sendall(encryptedBroadcast)
-        receivedMessage = cipher.decrypt(clientSocket.recv(1024)).decode()
-        self.assertEqual(broadcastMessage, receivedMessage)
-
-        clientSocket.close()
-"""
 
 if __name__ == "__main__":
     unittest.main()
