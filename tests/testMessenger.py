@@ -1,82 +1,82 @@
-import unittest
 import socket
 import threading
-import time
-import server
-from cryptography.fernet import Fernet
+import unittest
 
-# Constants for testing
-HOST = '127.0.0.1'
-PORT = 5500
-KEY = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='
-cipher = Fernet(KEY)
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 
-class TestMessenger(unittest.TestCase):
+from client import DiffieHellmanClient
+from server import shutdown_server, start_server
+
+
+class TestDiffieHellmanClient(unittest.TestCase):
     def setUp(self):
+        """Set up the server in a separate thread and connect two clients."""
         # Start the server in a separate thread
-        serverThread = threading.Thread(target=server.startServer)
-        serverThread.daemon = True
-        serverThread.start()
-        time.sleep(1)  # Ensure server is ready before tests start
-    
-    def testClientConnection(self):
-        # Test if the client can connect to the server and send a username
-        clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        clientSocket.connect((HOST, PORT))
-        testUsername = 'TestUserName'
-        encryptedUsername = cipher.encrypt(testUsername.encode('UTF-8'))
-        clientSocket.sendall(encryptedUsername)
-        self.assertTrue(clientSocket)
-        clientSocket.close()
+        self.server_thread = threading.Thread(target=start_server)
+        self.server_thread.daemon = True  # Ensures the thread terminates with the main thread
+        self.server_thread.start()
+        # Connect two clients to the server
+        self.client1_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client2_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def testMessageEncryptionDecryption(self):
-        # Test encryption and decryption
-        message = "HelloWorld!"
-        encryptedMessage = cipher.encrypt(message.encode('utf-8'))
-        decryptedMessage = cipher.decrypt(encryptedMessage).decode('utf-8')
-        self.assertEqual(decryptedMessage, message)
-
-    def testClientReceiveMessage(self):
-        # Test message broadcasting functionality
-        client1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        username1 = 'hey bababa'
-        username2 = 'hey hal'
-        encryptedUsername1 = cipher.encrypt(username1.encode('utf-8'))
-        encryptedUsername2 = cipher.encrypt(username2.encode('utf-8'))
-
-        client1.connect((HOST, PORT))
-        client2.connect((HOST, PORT))
+        # Connect both clients to the server
+        self.client1_socket.connect(('127.0.0.1', 5500))
+        self.client2_socket.connect(('127.0.0.1', 5500))
         
-        # Send usernames for both clients
-        client1.sendall(encryptedUsername1)
-        client2.sendall(encryptedUsername2)
 
-        # Allow server to process and broadcast the join messages
-        time.sleep(1)
+        # Receive DH parameters from the server for both clients
+        param_bytes1 = self.client1_socket.recv(4096)
+        self.parameters = serialization.load_pem_parameters(param_bytes1, backend=default_backend())
 
-        # Client1 sends a message, and we check if Client2 receives it
-        message1 = "HelloFromClient1"
-        encryptedMessage1 = cipher.encrypt(message1.encode())
-        client1.sendall(encryptedMessage1)
-        receivedMessage1 = cipher.decrypt(client2.recv(1024)).decode()
-        self.assertEqual(receivedMessage1, message1)
-        # Client2 sends a message, and we check if Client1 receives it
-        message2 = "HelloFromClient2"
-        encryptedMessage2 = cipher.encrypt(message2.encode())
-        client2.sendall(encryptedMessage2)
+        # Create DiffieHellmanClient objects for each client
+        self.client1 = DiffieHellmanClient(self.parameters)
+        self.client2 = DiffieHellmanClient(self.parameters)
 
-        receivedMessage2 = cipher.decrypt(client1.recv(1024)).decode()
-        self.assertEqual(receivedMessage2, message2)
+        # Exchange public keys between clients
+        self.client1_socket.sendall(self.client1.serialize_public_key())
+        self.client2_socket.sendall(self.client2.serialize_public_key())
+
+        peer_public_key_client1 = DiffieHellmanClient.deserialize_public_key(self.client2_socket.recv(4096))
+        peer_public_key_client2 = DiffieHellmanClient.deserialize_public_key(self.client1_socket.recv(4096))
+
+        # Derive the shared secret for each client
+        self.client1.derive_shared_secret(peer_public_key_client1)
+        self.client2.derive_shared_secret(peer_public_key_client2)
+
+    def test_client_connection(self):
+        """Test if the clients can successfully exchange messages after key establishment."""
+        # Encrypt a message from client 1 and send it to client 2
+        message = "Hello from Client 1"
+        encrypted_message = self.client1.encrypt_message(message)
+        self.client1_socket.sendall(encrypted_message)
+
+        # Receive and decrypt the message on client 2
+        received_encrypted_message = self.client2_socket.recv(4096)
+        decrypted_message = self.client2.decrypt_message(received_encrypted_message)
+        print(f"Decrypted message received: {decrypted_message}")
+        # Assert that the decrypted message matches the original
+        self.assertEqual(decrypted_message, message)
+
+    def test_client_reverse_communication(self):
+        """Test message sending from Client 2 to Client 1."""
+        # Encrypt a message from client 2 and send it to client 1
+        message = "This is a verrry long message, I hope it is gonna pass."
+        encrypted_message = self.client2.encrypt_message(message)
+        self.client2_socket.sendall(encrypted_message)
+
+        # Receive and decrypt the message on client 1
+        received_encrypted_message = self.client1_socket.recv(4096)
+        decrypted_message = self.client1.decrypt_message(received_encrypted_message)
+
+        # Assert that the decrypted message matches the original
+        self.assertEqual(decrypted_message, message)
         
-        client1.close()
-        client2.close()
     def tearDown(self):
-        # Cleanup server and any connections if necessary
-        for client in server.clients:
-            client.close()
-        server.serverObject.close()  # Close the server socket
+        """Shut down the server and close all client connections."""
+        shutdown_server(None, [self.client1_socket, self.client2_socket])  # Close connections
+        self.client1_socket.close()
+        self.client2_socket.close()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

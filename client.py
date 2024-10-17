@@ -1,105 +1,135 @@
+import os
 import socket
 import threading
-from cryptography.fernet import Fernet
 
-#Set host and port
-HOST = '127.0.0.1'
-PORT = 5500
-KEY = '6wsunZhIiHUWxJqQ74p6ICRivUFmlR6hOz8ec_MDUKk='
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives.padding import PKCS7
 
-"""
-    socket.socket(...): This function initializes a new socket object that can connect to another machine over the network.
-    socket.AF_INET: Specifies the address family as IPv4, meaning it will use IPv4 addresses (e.g., 192.168.1.1).
-    socket.SOCK_STREAM: Specifies the socket type as TCP, which is a connection-oriented, reliable, and ordered communication protocol.
-"""
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-# Shuts down threads. When threading.Event.is_set() then they both shut down.
-shutdownEvent = threading.Event()
+class DiffieHellmanClient:
+    def __init__(self, parameters):
+        # Generate parameters for Diffie-Hellman
+        self.parameters = parameters
+        self.private_key = self.generate_private_key()
+        self.public_key = self.private_key.public_key()
+        self.shared_secret = None
 
-# Sets a timeout for the socket operations associated with client. 
-client.settimeout(5)
+    def generate_private_key(self):
+        """Generate a private key using the DH parameters."""
+        return self.parameters.generate_private_key()
 
-try:
-    client.connect((HOST, PORT)) # Attempts to connect the client socket to the server at the specified HOST and PORT.
-    print("Connected to the server successfully.")
-except socket.error as e: # Catches any socket-related errors that occur during the connection attempt.
-    print(f"Could not connect to server: {e}")
-    exit(1)  # Exits if the connection fails
-"""
-    Fernet key must be 32 url-safe base64-encoded bytes, therefore so long.
-    Random key generated once from Fernet.generate_key. Just using the same key in the server and client for now.
-"""
-cipher = Fernet(KEY) #Using a Fernet object as cypher to encrypt and decrypt messages.
+    def serialize_public_key(self):
+        """Serialize the public key to PEM format."""
+        return self.public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
 
-"""
-    This function is for receiving a message.
-    It listens for messages until the connection is closed
-"""
-def receive():
+    @staticmethod
+    def deserialize_public_key(pem):
+        """Deserialize the public key from PEM format."""
+        return serialization.load_pem_public_key(pem, backend=default_backend())
+
+    def derive_shared_secret(self, peer_public_key):
+        """Derive the shared secret using the private key and the peer's public key."""
+        # Compute the shared key
+        shared_key  = self.private_key.exchange(peer_public_key)
+
+        # Derive a key using HKDF
+        hkdf = HKDF(
+            algorithm=hashes.SHA256(),
+            length=32,  # Length of the derived key in bytes
+            salt=None,
+            info=b'handshake data'
+        )
+        self.shared_secret = hkdf.derive(shared_key)
+
+    def encrypt_message(self, message):
+        # AES encryption with shared key
+        iv = os.urandom(16)  # Random IV for AES CBC mode
+        cipher = Cipher(algorithms.AES(self.shared_secret), modes.CBC(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+
+        # Padding the message to be block-size compatible
+        padder = PKCS7(256).padder()
+        padded_message = padder.update(message.encode()) + padder.finalize()
+
+        encrypted_message = encryptor.update(padded_message) + encryptor.finalize()
+        return iv + encrypted_message  # Prepend IV to the encrypted message
+
+    def decrypt_message(self, encrypted_message):
+        iv = encrypted_message[:16]  # Extract the IV
+        cipher = Cipher(algorithms.AES(self.shared_secret), modes.CBC(iv), backend=default_backend())
+        decryptor = cipher.decryptor()
+
+        decrypted_padded_message = decryptor.update(encrypted_message[16:]) + decryptor.finalize()
+
+        # Unpad the decrypted message
+        unpadder = PKCS7(256).unpadder()
+        decrypted_message = unpadder.update(decrypted_padded_message) + unpadder.finalize()
+
+        return decrypted_message.decode()
+
+def send_messages(client_socket, client):
+    #username = input("Enter your username: ")
+    """Thread function to send messages."""
+    while True:
+        #send_username(username)
+        message = input("Enter message to send: ")
+        encrypted_message = client.encrypt_message(message)
+        client_socket.sendall(encrypted_message)
+        print(f"Encrypted message sent.")
+
+def send_username(username, client_socket):
+    client_socket.send(username)
+
+def receive_messages(client_socket, client):
+    """Thread function to receive messages."""
     while True:
         try:
-            encryptedMessage = client.recv(1024) # Receives up to 1024 bytes of data from the server. If there’s data, it’s stored in the encryptedMessage variable.
-            if encryptedMessage: # Checks if data was received. If it was, it attempts to decrypt it using the cipher and  storing it in decryptedMessage variable.
-                decryptedMessage = cipher.decrypt(encryptedMessage).decode('utf-8')
-                print ('Encrypted message: ', encryptedMessage)
-                print(decryptedMessage)
-            else: # If encryptedMessage is empty (indicating the server has closed the connection), it prints a message, closes the socket, and exits the loop to stop listening.
-                print("Server has closed the connection.")
-                client.close()
+            encrypted_message_from_peer = client_socket.recv(4096)
+            if encrypted_message_from_peer:
+                decrypted_message = client.decrypt_message(encrypted_message_from_peer)
+                print(f"Decrypted message received: {decrypted_message}")
+            else:
+                print("Connection closed by the peer.")
                 break
-
-        except socket.timeout: # If a timeout occurs (as set by client.settimeout(5)), it ignores the timeout, allowing the loop to continue without interruption.
-            continue  # Ignore timeout and keep looping until connection is closed
-
         except Exception as e:
-            print(f"An error occurred in receive: {e}")
-            client.close
+            print(f"Error in receiving messages: {e}")
             break
 
+def start_client(host = '127.0.0.1', port = 5500):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+        client_socket.connect((host, port))
+        # Receive DH parameters from the server
+        param_bytes = client_socket.recv(4096)
+        parameters = serialization.load_pem_parameters(param_bytes, backend=default_backend())
 
-def encryptUsername(username):
-    encryptedUsername = cipher.encrypt(username.encode('utf-8' ))
-    return encryptedUsername
+        client = DiffieHellmanClient(parameters)
 
-def sendUsername(username):
-    encryptedUsername = encryptUsername(username)
-    client.send(encryptedUsername)
-
-"""
-    This function is for sending a message.
-    Also it sets the username for the user then sending its encrypted username to the server.
-"""
-def send():
-    username = input("Enter your username: ") # Prompts the user to enter their username, which will be sent to the server as the initial identification.
-    try:
-        if not shutdownEvent.is_set(): # Checks if the shutdownEvent is triggered, meaning the connection should close. If not, the function proceeds.
-            # Encrypts the username, converting it from plaintext to an encrypted byte form.
-            sendUsername(username)
-            print("Your username is sent to server.")
-            print("Type a message in the command line to send a message to the server:")
+        public_key_serialized = client.serialize_public_key()
+        client_socket.sendall(public_key_serialized)
         
-        while not shutdownEvent.is_set(): #: Starts a loop to continuously accept user input messages until the shutdownEvent is triggered.
-            message = input('') # Collects a new message from the user each time
-            fullMessage = f"[{username}]: {message}"
-            if shutdownEvent.is_set():  # After each input, the function checks if shutdownEvent was set (possibly by another function or error). If so, it breaks out of the loop.
-                break
-            encryptedMessage = cipher.encrypt(fullMessage.encode('utf-8')) # Encrypts message
-            client.send(encryptedMessage) # Send using the socket object.
-    except socket.timeout:
-        print("Socket operation timed out.")
-    except OSError as e:
-        print(f"An error occurred in send: {e}")
-        shutdownEvent.set()
-        client.close()
+        # Receive the other client's public key
+        peer_public_key_serialized = client_socket.recv(4096)
+        peer_public_key = DiffieHellmanClient.deserialize_public_key(peer_public_key_serialized)
 
-# Start the threads
-receiveThread = threading.Thread(target=receive)
-sendThread = threading.Thread(target=send)
+        # Derive shared secret
+        client.derive_shared_secret(peer_public_key)
+        print(f"Shared secret established")
+        # Start threads for sending and receiving messages
+        receive_thread = threading.Thread(target=receive_messages, args=(client_socket, client))
+        send_thread = threading.Thread(target=send_messages, args=(client_socket, client))
 
-receiveThread.start()
-sendThread.start()
+        receive_thread.start()  # Start listening for incoming messages first
+        send_thread.start()  # Allow the user to send messages
 
-# Ensure both threads close properly
-receiveThread.join()
-sendThread.join()
+        # Join both threads to keep the main thread alive
+        receive_thread.join()
+        send_thread.join()
+
+if __name__ == "__main__":
+    start_client()
