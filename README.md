@@ -62,4 +62,24 @@ For the sake of sanity, and so much more, lets keep these naming conventions whe
    - Use camelCase prefixed with `test` for test method names.
    - Example: `testUserLogin()`, `testEncryptionProcess()`
 
-Lets have some fun and learn new stuff!
+
+ ## Requirements
+**End-to-End Encryption (E2EE):** Ensure only clients can decrypt messages, protecting the content from the server and other unauthorized access.
+
+**AES-128 Encryption for Messages:** Secure message contents using AES-128 encryption, where encryption keys are shared exclusively between communicating clients.
+
+**Signal Protocol:** Implement the Signal Protocol to enable asynchronous and secure messaging, supporting robust encryption and communication between online and offline clients.
+
+**Double Ratchet Algorithm:** Use the Double Ratchet algorithm to rotate encryption keys with each message, maintaining forward secrecy and integrity across all interactions.
+
+**Diffie-Hellman Key Exchange:** Use the standard Diffie-Hellman key exchange to establish shared encryption keys over the network securely, ensuring confidentiality during the initial handshake.
+
+(Optional) **Secure Group Chat Support:** Extend encryption capabilities to include group chats, allowing multiple clients to securely exchange messages within a single, private conversation.
+
+**Perfect Forward Secrecy (PFS):** Guarantee that each session uses unique encryption keys, so past communications remain secure even if future keys are compromised.
+
+**User Authentication with RSA:** Use RSA for user identity verification, establishing trust between clients during initial connections and prior to setting up encrypted sessions.
+
+**Command-Line Interface (CLI):** Build a clear, user-friendly CLI for both client and server interactions, enabling users to connect, send messages, and view chat history in the terminal.
+
+**Server-Facilitated Communication:** Have the server handle client connections and message routing while enforcing E2EE, ensuring it cannot access message content directly.
