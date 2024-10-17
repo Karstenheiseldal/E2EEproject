@@ -59,8 +59,8 @@ For the sake of sanity, and so much more, lets keep these naming conventions whe
    - Example: `globalSettings`, `sharedData`
 
 9. **Test Methods**
-   - Use camelCase prefixed with `test` for test method names.
-   - Example: `testUserLogin()`, `testEncryptionProcess()`
+   - Use Snake Case prefixed with `test_` for test method names.
+   - Example: `test_user_login()`, `test_encryption_process()`
 
 
  ## Requirements
