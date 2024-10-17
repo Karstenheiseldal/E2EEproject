@@ -10,7 +10,7 @@ HOST = '127.0.0.1' # Sets the IP address for the localhost which means the serve
 PORT = 5500 # Specifies the port the server listens on. The client will connect to this same port to communicate with the server.
 
 clients = [] # Array of clients
-encryptedUsernames = [] # Array of usernames
+usernames = [] # Array of usernames
 
 publicKeys = {}
 
@@ -26,12 +26,14 @@ def startServer():
         client, address = serverObject.accept()
         print(f"User connected from {address}")
         print(f"Participants: {len(clients)+1}")
+        print(usernames)
         # Handle username and add client to lists
         clients.append(client)
-        encryptedUsername = client.recv(1024)
-        if encryptedUsername:
-            encryptedUsernames.append(encryptedUsername)
-            thread = threading.Thread(target=handleClient, args=(client, encryptedUsername))
+        username = client.recv(1024)
+        print(username, " is connected.")
+        if username:
+            usernames.append(username)
+            thread = threading.Thread(target=handleClient, args=(client, username))
             thread.start()
         else:
             print("No username received, closing connection.")
@@ -40,22 +42,22 @@ def startServer():
 
 # The following function manages communication with a single connected client. 
 # It receives, decrypts, and forwards messages from this client to others, while handling disconnects and errors. 
-def handleClient(client, encryptedUsername): 
+def handleClient(client, username): 
     while True:
         try:
             # Receive encrypted data from the client
-            encryptedData = client.recv(1024)
-            if not encryptedData:  # Client disconnected
-                print(f"{encryptedUsername} has disconnected.")
+            encryptedMessage = client.recv(1024)
+            if not encryptedMessage:  # Client disconnected
+                print(f"{username} has disconnected.")
                 break
             
-            print(f"Encrypted data received from {encryptedUsername}: {encryptedData}")
-            forwardMessage(encryptedData, client)  # Forwards as bytes, no conversion
+            print(f"Encrypted data received from {username}: {encryptedMessage}")
+            forwardMessage(encryptedMessage, client)  # Forwards as bytes, no conversion
             
         except Exception as e:
             print(f"Error : {e}")
             break
-    remove(client, encryptedUsername)
+    remove(client, username)
     
 def forwardMessage(encryptedMessage: bytes, senderClient=None):
     print("ForwardingMessage message")  # Debug statement
@@ -67,16 +69,16 @@ def forwardMessage(encryptedMessage: bytes, senderClient=None):
                 print(f"Failed to send message to a client: {e}")
                 remove(client, encryptedMessage(client))
 
-def remove(client, encryptedUsername):
+def remove(client, username):
     if client in clients:
         clients.remove(client)
         client.close()
-    if encryptedUsername in encryptedUsernames:
-        encryptedUsernames.remove(encryptedUsername)
+    if username in usernames:
+        usernames.remove(username)
     
     # Encrypt and forward the leave message to ensure it’s bytes
-    leave_message = cipher.encrypt(f"{encryptedUsername} has left the chat.".encode('utf-8'))
-    forwardMessage(leave_message)
+    leaveMessage = f"{username} has left the chat.".encode('utf-8')
+    forwardMessage(leaveMessage)
 
 if __name__ == "__main__":
     try:
