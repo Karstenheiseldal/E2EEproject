@@ -9,7 +9,12 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.padding import PKCS7
 
+# Create events for managing input prompts
 input_ready = threading.Event()  # This will be used as a flag to signal when input is allowed.
+input_queue = queue.Queue()
+send_done_event = threading.Event()  # Event to handle sending
+recieve_done_event = threading.Event()  # Event to handle sending
+
 
 class DiffieHellmanClient:
     def __init__(self, parameters):
@@ -59,6 +64,7 @@ class DiffieHellmanClient:
         decrypted_message = unpadder.update(decrypted_padded_message) + unpadder.finalize()
         return decrypted_message.decode()
 
+
 def receive_with_length_prefix(conn):
     """Helper function to receive data with a length prefix."""
     data_length = int.from_bytes(conn.recv(4), 'big')
@@ -70,41 +76,61 @@ def receive_with_length_prefix(conn):
         data += packet
     return data
 
-def capture_input(input_queue):
+
+def capture_input(input_queue, send_done_event):
     """Thread function to capture user input and store it in a queue."""
     input_ready.wait()  # Wait until the 'READY' signal is received
     while True:
-        message = input("Enter message to send: ")
+        #recieve_done_event.wait()
+        #recieve_done_event.clear()
+        send_done_event.wait()  # Wait for the send_done_event to be set before prompting for input
+        send_done_event.clear()  # Immediately clear it before input
+        print("Enter message to send: ", end='')  # Print the input prompt without a newline
+        message = input()  # User enters the message on the same line
         input_queue.put(message)
+        # The next prompt will appear after the message is sent
 
-def send_messages(client_socket, client, input_queue):
+def send_messages(client_socket, client, input_queue, send_done_event):
     """Thread function to send messages from the input queue."""
     while True:
         message = input_queue.get()  # Block until there's a message in the queue
         if message:
-            encrypted_message = client.encrypt_message(message)
-            message_length = len(encrypted_message).to_bytes(4, 'big')
-            client_socket.sendall(message_length + encrypted_message)
-            print("Encrypted message sent.")
+            try:
+                encrypted_message = client.encrypt_message(message)
+                message_length = len(encrypted_message).to_bytes(4, 'big')
+                client_socket.sendall(message_length + encrypted_message)
+                print(f"Encrypted message sent: {message}")
+                send_done_event.set()
+                recieve_done_event.set()
 
-def receive_messages(client_socket, client):
+            except Exception as e:
+                print(f"Error in encrypting or sending message: {e}")
+            
+            
+                
+            
+
+def receive_messages(client_socket, client, recieve_done_event):
     """Thread function to receive messages."""
     while True:
+        recieve_done_event.clear()
         try:
             # Receive message length first or the "READY" message
             message_length_data = client_socket.recv(4)
+
             if not message_length_data:
                 print("Connection closed by the peer.")
                 break
-            
+
             # Check if the message is "READY"
             if message_length_data == b"READ":
                 rest_of_ready = client_socket.recv(1)  # Read the last byte ('Y') from "READY"
                 input_ready.set()
                 print("Received 'READY' from the server. Clients can start chatting.")
-                print()
+                recieve_done_event.set()  # Ensure that input prompt appears after 'READY'
                 continue  # Skip processing and wait for the actual message
-            
+
+            # Get the length of the incoming encrypted message
             message_length = int.from_bytes(message_length_data, 'big')
 
             # Receive the actual encrypted message based on the length received
@@ -114,11 +140,19 @@ def receive_messages(client_socket, client):
                 if not packet:
                     raise ValueError("Connection closed before all data received.")
                 encrypted_message_from_peer += packet
-
-            # Decrypt the message
-            decrypted_message = client.decrypt_message(encrypted_message_from_peer)
-            print(f"Decrypted message received: {decrypted_message}")
             
+            # Decrypt the message
+            try:
+                decrypted_message = client.decrypt_message(encrypted_message_from_peer)
+                print(f"Decrypted message received: {decrypted_message}")
+                # Prompt user for new input after receiving a message
+
+            except ValueError as e:
+                print(f"Error decrypting message (possibly padding issue): {e}")
+            
+            recieve_done_event.set()
+            send_done_event.set()
+
         except Exception as e:
             print(f"Error in receiving messages: {e}")
             break
@@ -159,10 +193,13 @@ def start_client(host='127.0.0.1', port=5500):
             print(f"Failed to deserialize peer's public key: {e}")
             return  # Exit if deserialization fails
 
+        send_done_event.set()  # Set the send event to allow the first input
+        recieve_done_event.set()
+
         # Step 5: Start threads for sending and receiving messages
-        input_thread = threading.Thread(target=capture_input, args=(input_queue,))
-        send_thread = threading.Thread(target=send_messages, args=(client_socket, client, input_queue))
-        receive_thread = threading.Thread(target=receive_messages, args=(client_socket, client))
+        input_thread = threading.Thread(target=capture_input, args=(input_queue, send_done_event))  # Pass send_done_event
+        send_thread = threading.Thread(target=send_messages, args=(client_socket, client, input_queue, send_done_event))  # Pass send_done_event
+        receive_thread = threading.Thread(target=receive_messages, args=(client_socket, client, recieve_done_event))
 
         # Start all threads
         input_thread.start()
@@ -172,6 +209,7 @@ def start_client(host='127.0.0.1', port=5500):
         input_thread.join()
         send_thread.join()
         receive_thread.join()
+
 
 if __name__ == "__main__":
     start_client()
