@@ -195,6 +195,9 @@ def start_client(host='127.0.0.1', port=5500):
                     server_response = client_socket.recv(1024).decode()
                     print(f"{server_response}")
 
+        except:
+            print("Connection has been aborted")
+            client_socket.close()
         finally:
             # Close the client connection
             client_socket.close()
