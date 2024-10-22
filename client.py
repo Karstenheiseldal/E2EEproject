@@ -166,18 +166,39 @@ def start_client(host='127.0.0.1', port=5500):
         # Step 1: Prompt for username and send it to the server
         username = input("Enter your username: ")
         client_socket.sendall(username.encode('utf-8'))
-        print("Username sent. Waiting for peer's public key...")
+        print("Username sent")
 
         # Step 2: Receive DH parameters from the server and create DH key pair
         param_bytes = receive_with_length_prefix(client_socket)
         parameters = serialization.load_pem_parameters(param_bytes, backend=default_backend())
         client = DiffieHellmanClient(parameters)
-
         # Step 3: Send client's public key to the server
         public_key_serialized = client.serialize_public_key()
         client_socket.sendall(len(public_key_serialized).to_bytes(4, 'big') + public_key_serialized)
         print("Public key sent to the server.")
+        try:
+            while True:
+                # Get input from the user (client terminal)
+                message = input("Enter a message to send to the server (type 'exit' to quit): ")
 
+                # If the user types 'exit', close the connection
+                if message.lower() == 'exit':
+                    print("Closing connection to the server...")
+                    break
+
+                # Send the message to the server
+                client_socket.send(message.encode())
+
+                # If the message is "!get_users", expect a response from the server
+                if message == "!get_users":
+                    # Receive the response from the server
+                    server_response = client_socket.recv(1024).decode()
+                    print(f"{server_response}")
+
+        finally:
+            # Close the client connection
+            client_socket.close()
+        """
         # Step 4: Receive peer's public key with length prefix
         peer_public_key_serialized = receive_with_length_prefix(client_socket)
         print("Received peer's public key:")
@@ -209,7 +230,7 @@ def start_client(host='127.0.0.1', port=5500):
         input_thread.join()
         send_thread.join()
         receive_thread.join()
-
+        """
 
 if __name__ == "__main__":
     start_client()

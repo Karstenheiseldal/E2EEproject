@@ -3,12 +3,11 @@ import threading
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import dh
 
-usernames = {}
-clients = {}
-public_keys = {}
+clients = dict()
 
+"""
 def handle_client(conn, peer_conn):
-    """Thread function to relay messages between clients."""
+    #Thread function to relay messages between clients.
     try:
         while True:
             # Receive the message length first
@@ -36,14 +35,10 @@ def handle_client(conn, peer_conn):
         print(f"Error relaying message: {e}")
     finally:
         conn.close()
-
-def send_with_length_prefix(conn, data):
-    """Helper function to send data with a length prefix."""
-    data_length = len(data).to_bytes(4, 'big')
-    conn.sendall(data_length + data)
-
+"""
+"""
 def receive_with_length_prefix(conn):
-    """Helper function to receive data with a length prefix."""
+    # Helper function to receive data with a length prefix.
     data_length = int.from_bytes(conn.recv(4), 'big')
     data = b""
     while len(data) < data_length:
@@ -52,6 +47,22 @@ def receive_with_length_prefix(conn):
             raise ValueError("Connection closed before all data received.")
         data += packet
     return data
+"""
+
+def send_with_length_prefix(conn, data):
+    """Helper function to send data with a length prefix."""
+    data_length = len(data).to_bytes(4, 'big')
+    conn.sendall(data_length + data)
+
+def get_connections(client : socket.socket, clients : dict):
+    while True:
+        client_message = client.recv(4096).decode()
+        if client_message == "!get_users":
+            response = ""
+            for username, value in clients.items():
+                response += f"Username: {username}, Address: {value['address']} \n"
+            # Send the response to the client
+            client.send(response.encode())
 
 def start_server(host='127.0.0.1', port=5500):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -64,60 +75,20 @@ def start_server(host='127.0.0.1', port=5500):
         )
         print("Server is listening for connections...")
 
-        # Accept connections from Client 1 and Client 2
-        conn1, addr1 = server_socket.accept()
-        print(f"Connected to Client 1: {addr1}")
-        conn2, addr2 = server_socket.accept()
-        print(f"Connected to Client 2: {addr2}")
-
-        # Step 1: Receive usernames from both clients and store them in the dictionaries
-        username1 = conn1.recv(4096).decode()
-        usernames[conn1] = username1
-        clients[username1] = conn1
-        print(f"Client 1 username: {username1}")
-
-        username2 = conn2.recv(4096).decode()
-        usernames[conn2] = username2
-        clients[username2] = conn2
-        print(f"Client 2 username: {username2}")
-
-        # Step 2: Send DH parameters to both clients
-        send_with_length_prefix(conn1, param_bytes)
-        send_with_length_prefix(conn2, param_bytes)
-
-        # Step 3: Receive public keys from both clients
-        client1_public_key = receive_with_length_prefix(conn1)
-        public_keys[username1] = client1_public_key
-        print(f"Received public key from {username1}")  # Debug
-
-        client2_public_key = receive_with_length_prefix(conn2)
-        public_keys[username2] = client2_public_key
-        print(f"Received public key from {username2}")  # Debug
-
-        # Step 4: Relay public keys
-        send_with_length_prefix(conn1, public_keys[username2])  # Send Client 2's public key to Client 1
-        send_with_length_prefix(conn2, public_keys[username1])  # Send Client 1's public key to Client 2
-        print("Public keys exchanged between clients.")
-
-        # Step 5: Notify both clients that they are ready to communicate
-        conn1.sendall(b"READY")
-        conn2.sendall(b"READY")
-        print("Clients notified that they are ready to communicate.")
-
-        # Start threads for message relaying
-        client1_thread = threading.Thread(target=handle_client, args=(conn1, conn2))
-        client2_thread = threading.Thread(target=handle_client, args=(conn2, conn1))
-
-        client1_thread.start()
-        client2_thread.start()
-
-        try:
-            client1_thread.join()
-            client2_thread.join()
-        except KeyboardInterrupt:
-            print("Server shutting down due to KeyboardInterrupt.")
-            server_socket.close()
-        print("Server shutting down...")
+        while True:
+            client, address = server_socket.accept()
+            print(f"User connected from {address}")
+            print(f"Participants: {len(clients)+1}")
+            client_username = client.recv(4096).decode()
+            print(f"Username of the client:{client_username}")
+            send_with_length_prefix(client, param_bytes)
+            client_public_key = client.recv(4096).decode()
+            clients[client_username] = {
+                "address" : address,
+                "public_key" : client_public_key
+            }
+            handle_client_thread = threading.Thread(target=get_connections, args=(client, clients))
+            handle_client_thread.start()
 
 if __name__ == "__main__":
     start_server()
