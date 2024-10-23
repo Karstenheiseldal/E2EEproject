@@ -58,8 +58,9 @@ def send_with_length_prefix(conn, data):
     data_length = len(data).to_bytes(4, 'big')
     conn.sendall(data_length + data)
 
-def get_connections(client : socket.socket, clients : dict):
-    global shutdown_flag
+def handle_client(client : socket.socket, client_username):
+    global clients, client_sockets
+    #while not shutdown_flag:
     while not shutdown_flag:
         try:
             client_message = client.recv(4096).decode()
@@ -69,7 +70,21 @@ def get_connections(client : socket.socket, clients : dict):
                     response += f"Username: {username}, Address: {value['address']} \n"
                 # Send the response to the client
                 client.send(response.encode())
+            if client_message == "exit":
+                print("Deleting client from the dictionary and closing the socket on server side.")
+                del clients[client_username]
+                client_sockets.remove(client)
+                client.close()
+                break
+            # TODO: Figure out how we can compare the client, when client.close() calls . "if not client" does not work in this case.   
+            if not client:
+                del clients[client_username]
+                client_sockets.remove(client)
+                break
         except :
+            del clients[client_username]
+            client_sockets.remove(client)
+            client.close()
             break
 
 def listen_for_shutdown():
@@ -109,27 +124,28 @@ def start_server(host='127.0.0.1', port=5500):
     shutdown_thread = threading.Thread(target=listen_for_shutdown)
     shutdown_thread.start()
     print("Server is listening for connections...")
-    while not shutdown_flag:
-        try:
-            client, address = server_socket.accept()
-            print(f"User connected from {address}")
-            print(f"Participants: {len(clients)+1}")
-            client_username = client.recv(4096).decode()
-            print(f"Username of the client:{client_username}")
-            send_with_length_prefix(client, param_bytes)
-            client_public_key = client.recv(4096).decode()
-            clients[client_username] = {
-                "address" : address,
-                "public_key" : client_public_key
-            }
-            handle_client_thread = threading.Thread(target=get_connections, args=(client, clients))
-            handle_client_thread.start()
-            client_sockets.append(client)
-        except OSError:
-            print("Server socket has been closed.")
-            break
-        finally:
-            client.close()
+    try:
+        while not shutdown_flag:
+            try:
+                client, address = server_socket.accept()
+                print(f"User connected from {address}")
+                print(f"Participants: {len(clients)+1}")
+                client_username = client.recv(4096).decode()
+                print(f"Username of the client:{client_username}")
+                send_with_length_prefix(client, param_bytes)
+                client_public_key = client.recv(4096).decode()
+                clients[client_username] = {
+                    "address" : address,
+                    "public_key" : client_public_key
+                }
+                handle_client_thread = threading.Thread(target=handle_client, args=(client, client_username))
+                handle_client_thread.start()
+                client_sockets.append(client)
+            except OSError:
+                print("Server socket has been closed.")
+                break
+    except Exception as e:
+        print(f"An error occurred on the server side. {e}")
 
 if __name__ == "__main__":
     start_server()

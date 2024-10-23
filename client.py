@@ -159,7 +159,6 @@ def receive_messages(client_socket, client, recieve_done_event):
 
 def start_client(host='127.0.0.1', port=5500):
     input_queue = queue.Queue()  # Create a queue for user input
-
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
         client_socket.connect((host, port))
 
@@ -178,23 +177,26 @@ def start_client(host='127.0.0.1', port=5500):
         print("Public key sent to the server.")
         try:
             while True:
-                # Get input from the user (client terminal)
-                message = input("Enter a message to send to the server (type 'exit' to quit): ")
+                try:
+                    # Get input from the user (client terminal)
+                    message = input("Enter a message to send to the server (type 'exit' to quit): ")
 
-                # If the user types 'exit', close the connection
-                if message.lower() == 'exit':
-                    print("Closing connection to the server...")
+                    # Send the message to the server
+                    client_socket.send(message.encode())
+
+                    # If the user types 'exit', close the connection
+                    if message.lower() == 'exit':
+                        print("Closing connection to the server...")
+                        break
+                    # If the message is "!get_users", expect a response from the server
+                    if message == "!get_users":
+                        # Receive the response from the server
+                        server_response = client_socket.recv(1024).decode()
+                        print(f"{server_response}")
+                except Exception as e:
+                    print(f"Something wrong happened on user side, aborting connection. Message: {e}")
+                    client_socket.close()
                     break
-
-                # Send the message to the server
-                client_socket.send(message.encode())
-
-                # If the message is "!get_users", expect a response from the server
-                if message == "!get_users":
-                    # Receive the response from the server
-                    server_response = client_socket.recv(1024).decode()
-                    print(f"{server_response}")
-
         except:
             print("Connection has been aborted")
             client_socket.close()

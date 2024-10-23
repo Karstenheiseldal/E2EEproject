@@ -45,7 +45,7 @@ class TestDiffieHellmanClient(unittest.TestCase):
         self.assertEqual(1, len(clients))
 
         # Step 4: Clean up (disconnect client)
-        client_socket.close()
+        client_socket.sendall("exit".encode())
 
     def test_several_user_connection(self):
         """Test if several clients can connect to the server."""
@@ -103,9 +103,42 @@ class TestDiffieHellmanClient(unittest.TestCase):
         self.assertEqual(clients[username_03]['public_key'], client_public_key_03)
         self.assertEqual(3, len(clients))
         # Step 4: Clean up (disconnect client)
-        client_socket.close()
-        client_socket_02.close()
-        client_socket_03.close()
+        client_socket.sendall("exit".encode())
+        client_socket_02.sendall("exit".encode())
+        client_socket_03.sendall("exit".encode())
+
+    def test_user_deletion(self):
+        """Test if the client stays in the clients dictionary after leaving."""
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect(('127.0.0.1', 5500))
+
+        # Step 1: Send username to server
+        username = "test_user"
+        client_socket.sendall(username.encode())
+
+        # Step 2: Receive DH parameter bytes from server
+        # Read the first 4 bytes (length prefix) to know the size of the data to receive
+        dh_param_length_data = client_socket.recv(4)
+        dh_param_length = int.from_bytes(dh_param_length_data, 'big')
+        dh_params = client_socket.recv(dh_param_length)
+
+        self.assertTrue(dh_params.startswith(b'-----BEGIN DH PARAMETERS-----'))
+
+        # Step 3: Send a dummy public key (for testing purposes)
+        client_public_key = "dummy_public_key"
+        client_socket.sendall(client_public_key.encode())
+
+        # Server needs to process and set the client
+        time.sleep(5)
+        # Check if the client is added to the `clients` dictionary on the server
+        self.assertIn(username, clients)
+        self.assertEqual(clients[username]['public_key'], client_public_key)
+        self.assertEqual(1, len(clients))
+
+        # Step 4: Clean up (disconnect client)
+        client_socket.send("exit".encode())
+        time.sleep(2)
+        self.assertEqual(0, len(clients))
 
     @classmethod
     def tearDownClass(cls):
