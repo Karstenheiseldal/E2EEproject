@@ -4,7 +4,7 @@ import threading
 import time
 import unittest
 
-from server import clients, server_socket, shutdown_flag, start_server
+from server import clients, shutdown_flag, start_server
 
 
 class TestDiffieHellmanClient(unittest.TestCase):
@@ -17,7 +17,6 @@ class TestDiffieHellmanClient(unittest.TestCase):
         cls.server_thread.start()
 
     def test_single_user_connection(self):
-        global server_socket, clients
         """Test if one client can connect to the server."""
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect(('127.0.0.1', 5500))
@@ -43,13 +42,13 @@ class TestDiffieHellmanClient(unittest.TestCase):
         # Check if the client is added to the `clients` dictionary on the server
         self.assertIn(username, clients)
         self.assertEqual(clients[username]['public_key'], client_public_key)
+        self.assertEqual(1, len(clients))
 
         # Step 4: Clean up (disconnect client)
         client_socket.close()
 
     def test_several_user_connection(self):
-        global server_socket, clients
-        """Test if one client can connect to the server."""
+        """Test if several clients can connect to the server."""
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect(('127.0.0.1', 5500))
 
