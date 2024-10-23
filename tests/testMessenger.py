@@ -1,82 +1,118 @@
+import os
 import socket
 import threading
+import time
 import unittest
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-
-from client import DiffieHellmanClient
-from server import shutdown_server, start_server
+from server import clients, server_socket, shutdown_flag, start_server
 
 
 class TestDiffieHellmanClient(unittest.TestCase):
-    def setUp(self):
-        """Set up the server in a separate thread and connect two clients."""
-        # Start the server in a separate thread
-        self.server_thread = threading.Thread(target=start_server)
-        self.server_thread.daemon = True  # Ensures the thread terminates with the main thread
-        self.server_thread.start()
-        # Connect two clients to the server
-        self.client1_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client2_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    @classmethod
+    def setUpClass(cls):
+        """Start the server in a background thread before tests."""
+        os.environ['TEST_MODE'] = '1'  # Set test mode to skip shutdown listener
+        cls.server_thread = threading.Thread(target=start_server)
+        cls.server_thread.daemon = True
+        cls.server_thread.start()
 
-        # Connect both clients to the server
-        self.client1_socket.connect(('127.0.0.1', 5500))
-        self.client2_socket.connect(('127.0.0.1', 5500))
-        
+    def test_single_user_connection(self):
+        global server_socket, clients
+        """Test if one client can connect to the server."""
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect(('127.0.0.1', 5500))
 
-        # Receive DH parameters from the server for both clients
-        param_bytes1 = self.client1_socket.recv(4096)
-        self.parameters = serialization.load_pem_parameters(param_bytes1, backend=default_backend())
+        # Step 1: Send username to server
+        username = "test_user"
+        client_socket.sendall(username.encode())
 
-        # Create DiffieHellmanClient objects for each client
-        self.client1 = DiffieHellmanClient(self.parameters)
-        self.client2 = DiffieHellmanClient(self.parameters)
+        # Step 2: Receive DH parameter bytes from server
+        # Read the first 4 bytes (length prefix) to know the size of the data to receive
+        dh_param_length_data = client_socket.recv(4)
+        dh_param_length = int.from_bytes(dh_param_length_data, 'big')
+        dh_params = client_socket.recv(dh_param_length)
 
-        # Exchange public keys between clients
-        self.client1_socket.sendall(self.client1.serialize_public_key())
-        self.client2_socket.sendall(self.client2.serialize_public_key())
+        self.assertTrue(dh_params.startswith(b'-----BEGIN DH PARAMETERS-----'))
 
-        peer_public_key_client1 = DiffieHellmanClient.deserialize_public_key(self.client2_socket.recv(4096))
-        peer_public_key_client2 = DiffieHellmanClient.deserialize_public_key(self.client1_socket.recv(4096))
+        # Step 3: Send a dummy public key (for testing purposes)
+        client_public_key = "dummy_public_key"
+        client_socket.sendall(client_public_key.encode())
 
-        # Derive the shared secret for each client
-        self.client1.derive_shared_secret(peer_public_key_client1)
-        self.client2.derive_shared_secret(peer_public_key_client2)
+        # Server needs to process and set the client
+        time.sleep(5)
+        # Check if the client is added to the `clients` dictionary on the server
+        self.assertIn(username, clients)
+        self.assertEqual(clients[username]['public_key'], client_public_key)
 
-    def test_client_connection(self):
-        """Test if the clients can successfully exchange messages after key establishment."""
-        # Encrypt a message from client 1 and send it to client 2
-        message = "Hello from Client 1"
-        encrypted_message = self.client1.encrypt_message(message)
-        self.client1_socket.sendall(encrypted_message)
+        # Step 4: Clean up (disconnect client)
+        client_socket.close()
 
-        # Receive and decrypt the message on client 2
-        received_encrypted_message = self.client2_socket.recv(4096)
-        decrypted_message = self.client2.decrypt_message(received_encrypted_message)
-        print(f"Decrypted message received: {decrypted_message}")
-        # Assert that the decrypted message matches the original
-        self.assertEqual(decrypted_message, message)
+    def test_several_user_connection(self):
+        global server_socket, clients
+        """Test if one client can connect to the server."""
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect(('127.0.0.1', 5500))
 
-    def test_client_reverse_communication(self):
-        """Test message sending from Client 2 to Client 1."""
-        # Encrypt a message from client 2 and send it to client 1
-        message = "This is a verrry long message, I hope it is gonna pass."
-        encrypted_message = self.client2.encrypt_message(message)
-        self.client2_socket.sendall(encrypted_message)
+        username_01 = "test_user01"
+        client_socket.sendall(username_01.encode())
 
-        # Receive and decrypt the message on client 1
-        received_encrypted_message = self.client1_socket.recv(4096)
-        decrypted_message = self.client1.decrypt_message(received_encrypted_message)
+        dh_param_length_data = client_socket.recv(4)
+        dh_param_length = int.from_bytes(dh_param_length_data, 'big')
+        dh_params = client_socket.recv(dh_param_length)
 
-        # Assert that the decrypted message matches the original
-        self.assertEqual(decrypted_message, message)
-        
-    def tearDown(self):
-        """Shut down the server and close all client connections."""
-        shutdown_server(None, [self.client1_socket, self.client2_socket])  # Close connections
-        self.client1_socket.close()
-        self.client2_socket.close()
+        self.assertTrue(dh_params.startswith(b'-----BEGIN DH PARAMETERS-----'))
+
+        client_public_key_01 = "dummy_public_key01"
+        client_socket.sendall(client_public_key_01.encode())
+
+        client_socket_02 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket_02.connect(('127.0.0.1', 5500))
+
+        username_02 = "test_user02"
+        client_socket_02.sendall(username_02.encode())
+
+        dh_param_length_data = client_socket_02.recv(4)
+        dh_param_length = int.from_bytes(dh_param_length_data, 'big')
+        dh_params = client_socket_02.recv(dh_param_length)
+
+        self.assertTrue(dh_params.startswith(b'-----BEGIN DH PARAMETERS-----'))
+
+        client_public_key_02 = "dummy_public_key02"
+        client_socket_02.sendall(client_public_key_02.encode())
+
+        client_socket_03 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket_03.connect(('127.0.0.1', 5500))
+
+        username_03 = "test_user03"
+        client_socket_03.sendall(username_03.encode())
+
+        dh_param_length_data = client_socket_03.recv(4)
+        dh_param_length = int.from_bytes(dh_param_length_data, 'big')
+        dh_params = client_socket_03.recv(dh_param_length)
+
+        self.assertTrue(dh_params.startswith(b'-----BEGIN DH PARAMETERS-----'))
+
+        client_public_key_03 = "dummy_public_key02"
+        client_socket_03.sendall(client_public_key_03.encode())
+        time.sleep(5)
+        # Asserts
+        self.assertIn(username_01, clients)
+        self.assertIn(username_02, clients)
+        self.assertIn(username_03, clients)
+        self.assertEqual(clients[username_01]['public_key'], client_public_key_01)
+        self.assertEqual(clients[username_02]['public_key'], client_public_key_02)
+        self.assertEqual(clients[username_03]['public_key'], client_public_key_03)
+        self.assertEqual(3, len(clients))
+        # Step 4: Clean up (disconnect client)
+        client_socket.close()
+        client_socket_02.close()
+        client_socket_03.close()
+
+    @classmethod
+    def tearDownClass(cls):
+        """Shutdown the server after tests."""
+        global shutdown_flag
+        shutdown_flag = True
 
 if __name__ == '__main__':
     unittest.main()
