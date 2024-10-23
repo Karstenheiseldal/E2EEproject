@@ -1,5 +1,7 @@
+import os
 import socket
 import threading
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import dh
 
@@ -57,7 +59,8 @@ def send_with_length_prefix(conn, data):
     conn.sendall(data_length + data)
 
 def get_connections(client : socket.socket, clients : dict):
-    while True:
+    global shutdown_flag
+    while not shutdown_flag:
         try:
             client_message = client.recv(4096).decode()
             if client_message == "!get_users":
@@ -72,17 +75,23 @@ def get_connections(client : socket.socket, clients : dict):
 def listen_for_shutdown():
     global server_socket
     global shutdown_flag
+
+    if os.getenv('TEST_MODE') == '1':
+        return  # Skip the shutdown listener in test mode
     while True:
         command = input("")
         if command.lower() == 'shutdown':
             print("Shutting down the server...")
             shutdown_flag = True
-            if server_socket:
-                server_socket.close()  # Close the server socket
-            for socket in client_sockets:
-                print("Closing client sockets.")
-                socket.close()
-            break
+            try:
+                if server_socket:
+                    server_socket.close()  # Close the server socket
+                for socket in client_sockets:
+                    print("Closing client sockets.")
+                    socket.close()
+                break
+            except Exception as e:
+                print(e)
 
 def start_server(host='127.0.0.1', port=5500):
     global server_socket
@@ -119,6 +128,8 @@ def start_server(host='127.0.0.1', port=5500):
         except OSError:
             print("Server socket has been closed.")
             break
+        finally:
+            client.close()
 
 if __name__ == "__main__":
     start_server()
