@@ -6,6 +6,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
+from registerCommunication import list_registered_clients, register_with_server, get_peer_address
+from messaging import start_messaging
 
 def save_dh_parameters(parameters, filename="dh_parameters.pem"):
     """Save DH parameters to a file."""
@@ -45,47 +47,12 @@ class DiffieHellmanClient:
             info=b'handshake data')
         return hkdf.derive(shared_key)
 
-# Register client with the registry server
-def register_with_server(username, ip, port, server_ip='127.0.0.1', server_port=5500):
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect((server_ip, server_port))
-            # Send purpose identifier for registration
-            registration_data = f"REGISTER\n{username},{ip},{port}"
-            print(f"Sending registration data: {registration_data.encode()}")
-            sock.sendall(registration_data.encode())  # Send the actual registration data next
-            response = sock.recv(1024).decode()
-            print(f"Server response: {response}")
-            return response == "Registration successful"
-        
-    except Exception as e:
-        print(f"Error registering with server: {e}")
-        return False
+#This modified exception is meant to help the connect or wait method    
+class ConnectionRefusedError(Exception):
+    """Exception raised when a P2P connection is refused."""
+    pass
 
-def get_peer_address(peer_username, server_ip='127.0.0.1', server_port=5500):
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect((server_ip, server_port))
-            query = f"QUERY\nGET_PEER {peer_username}"
-            print(f"Requesting address for peer: {peer_username}")
-            sock.sendall(query.encode())
-
-            peer_address = sock.recv(1024).decode()
-
-            # Check if peer address is properly formatted or if the peer is not found
-            if peer_address == "Peer not found":
-                print("Peer not found.")
-                return None
-
-            # Ensure we have both an IP and port returned
-            print(f"Received peer address: {peer_address}")
-            ip, port = peer_address.split(',')
-            return ip, int(port)  # Return the peer's IP and port
-    except Exception as e:
-        print(f"Error retrieving peer address: {e}")
-        return None
-
-# Peer-to-peer server that waits for a connection
+# Peer-to-peer server that listens for a connection
 def p2p_server(host, port, peer_username, parameters):
     client = DiffieHellmanClient(parameters=parameters)
     try:
@@ -109,7 +76,7 @@ def p2p_server(host, port, peer_username, parameters):
                     shared_secret = client.derive_shared_secret(peer_public_key)
                     print(f"Shared secret with {peer_username}: {shared_secret.hex()}")
 
-                    # Signal key exchange completion
+                    # Send key exchange completion
                     conn.sendall("KEY_EXCHANGE_DONE".encode())
                     confirmation = conn.recv(1024).decode()
                     if confirmation == "KEY_EXCHANGE_DONE":
@@ -122,6 +89,7 @@ def p2p_server(host, port, peer_username, parameters):
     except Exception as e:
         print(f"Error in P2P server: {e}")
 
+#This is the client connecting to a peer listening at their port
 def p2p_client(peer_ip, peer_port, peer_username, parameters):
     client = DiffieHellmanClient(parameters=parameters)
     try:
@@ -129,7 +97,7 @@ def p2p_client(peer_ip, peer_port, peer_username, parameters):
             client_socket.connect((peer_ip, peer_port))
             print(f"Connected to peer at {peer_ip}:{peer_port}")
 
-            # Receive and handle the server's public key
+            # Receive and handle the server peer's public key
             server_public_key_message = client_socket.recv(2048).decode()
             if server_public_key_message.startswith("KEY:"):
                 server_public_key_bytes = server_public_key_message[4:].encode()
@@ -141,7 +109,7 @@ def p2p_client(peer_ip, peer_port, peer_username, parameters):
                 serialized_public_key = client.serialize_public_key()
                 client_socket.sendall(f"KEY:{serialized_public_key.decode()}".encode())
 
-                # Signal key exchange completion
+                # Send key exchange completion
                 client_socket.sendall("KEY_EXCHANGE_DONE".encode())
 
                 # Wait for confirmation to proceed to messaging
@@ -153,64 +121,67 @@ def p2p_client(peer_ip, peer_port, peer_username, parameters):
                     print("Failed to confirm key exchange.")
             else:
                 print("Expected public key but received something else.")
-    except Exception as e:
-        print(f"Error in P2P client: {e}")
+    except OSError as e:
+        if e.errno == 10061:
+               raise ConnectionRefusedError(f"Connection to {peer_username} was refused.")
+        else:
+            print(f"Error in P2P client: {e}")
 
 
-def list_registered_clients(server_ip='127.0.0.1', server_port=5500):
-    """Request and return the list of registered clients from the server."""
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect((server_ip, server_port))
-            sock.sendall("QUERY\nLIST_CLIENTS".encode())
-            clients_list = sock.recv(1024).decode().strip()
-            print(f"Registered clients: {clients_list}")
-            return clients_list.split(',') if clients_list else []
-    except Exception as e:
-        print(f"Error retrieving list of clients: {e}")
-        return []
+# Attempt to connect to a peer, and if unsuccessful, act as a server and wait for a connection
+def connect_to_peer_or_wait(username, peer_username, ip, port, shared_parameters):
+    """Attempt to connect to the peer as client; if unavailable, switch to server mode and wait."""
+    peer_address = get_peer_address(peer_username, '127.0.0.1', 5500)
+    
+    if peer_address:
+        peer_ip, peer_port = peer_address
 
-def message_sender(client_socket):
-    """Continuously sends messages to the peer."""
-    while True:
-        message = input("You: ")
-        if message.lower() == 'exit':
-            print("Ending chat session.")
-            client_socket.sendall("MSG:Peer has left the chat.".encode())
-            client_socket.close()
-            break
+        print(f"{username} will first try to act as the client and connect to {peer_username}.")
+        
         try:
-            client_socket.sendall(f"MSG:{message}".encode())
+            # Attempt to connect as the client
+            p2p_client(peer_ip, peer_port, peer_username, shared_parameters)
+        except ConnectionRefusedError:
+            # Switch to server mode if connection was refused
+            print(f"Switching {username} to server mode to wait for {peer_username} to connect.")
+            p2p_server(ip, port, peer_username, shared_parameters)
         except Exception as e:
-            print(f"Error sending message: {e}")
-            break
+            print(f"Unexpected error: {e}")
+    else:
+        print(f"User {peer_username} is offline or unavailable.")
 
-def message_receiver(client_socket, peer_username):
-    """Listens for messages from the peer and prints them, prompting the user input afterward."""
+def main_menu(username, ip, port, shared_parameters):
+    """Main menu allowing the user to list clients or initiate a chat."""
     while True:
-        try:
-            message = client_socket.recv(1024).decode()
-            if message.startswith("MSG:"):
-                print(f"\n{peer_username}: {message[4:]}\nYou: ", end="")
-            elif message == "Peer has closed the connection.":
-                print(message)
-                break
-        except Exception as e:
-            print(f"Error receiving message: {e}")
+        print("\nOptions:")
+        print("1. List online users")
+        print("2. Connect to a user")
+        print("3. Exit")
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            # Get and display a list of registered (online) users
+            registered_clients = list_registered_clients()
+            if registered_clients:
+                print("Online users:", ", ".join(registered_clients))
+            else:
+                print("No users are online.")
+        
+        elif choice == '2':
+            # Allow the user to choose a peer and handle role-switching dynamically
+            peer_username = input("Enter the username of the person you want to chat with: ")
+            if peer_username and peer_username != username:
+                connect_to_peer_or_wait(username, peer_username, ip, port, shared_parameters)
+            else:
+                print("Invalid username or you cannot chat with yourself.")
+        
+        elif choice == '3':
+            print("Exiting...")
             break
+        else:
+            print("Invalid choice. Please enter 1, 2, or 3.")
 
-def start_messaging(conn, peer_username):
-    """Starts messaging by creating threads for receiving and sending messages using the existing connection."""
-    print("Messaging session started. Type 'exit' to leave.")
-
-    # Start receiving messages in a separate thread
-    threading.Thread(target=message_receiver, args=(conn, peer_username), daemon=True).start()
-
-    # Handle sending messages in the main thread
-    message_sender(conn)
-
-
-# Main client function
+# Main client starting function
 def start_client():
     try:
         username = input("Enter your username: ")
@@ -235,26 +206,9 @@ def start_client():
             print("Failed to register with the registry server. Exiting...")
             return
 
-        # Query the server for registered clients
-        registered_clients = list_registered_clients()
-        if len(registered_clients) == 1:  # Only itself is registered
-            print("No other clients are registered; starting as a P2P server.")
-            time.sleep(0.1)  # Add a small delay
-            peer_username = input("Enter peer's username for future connection: ")
-            p2p_server(ip, port, peer_username, shared_parameters)
-        else:  # Other clients are available
-            print("Other clients found; connecting as a P2P client.")
-            # Find a peer other than itself
-            peer_username = next((client for client in registered_clients if client != username), None)
-            if peer_username:
-                peer_address = get_peer_address(peer_username, '127.0.0.1', 5500)
-                if peer_address:
-                    peer_ip, peer_port = peer_address
-                    p2p_client(peer_ip, peer_port, peer_username, shared_parameters)  # Initiate P2P client
-                else:
-                    print("Failed to retrieve peer address.")
-            else:
-                print("No other clients to connect to.")
+        # Start the main menu
+        main_menu(username, ip, port, shared_parameters)
+
     except Exception as e:
         print(f"Error in client operation: {e}")
 
