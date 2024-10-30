@@ -1,11 +1,11 @@
 import socket
 import threading
-import os
-import sys
 import time
-from cryptography.hazmat.primitives import serialization, hashes
+
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
 
 def save_dh_parameters(parameters, filename="dh_parameters.pem"):
     """Save DH parameters to a file."""
@@ -27,7 +27,6 @@ class DiffieHellmanClient:
         self.private_key = self.parameters.generate_private_key()
         self.public_key = self.private_key.public_key()
 
-
     def serialize_public_key(self):
         return self.public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
@@ -43,8 +42,7 @@ class DiffieHellmanClient:
             algorithm=hashes.SHA256(),
             length=32,
             salt=None,
-            info=b'handshake data'
-        )
+            info=b'handshake data')
         return hkdf.derive(shared_key)
 
 # Register client with the registry server
@@ -52,7 +50,7 @@ def register_with_server(username, ip, port, server_ip='127.0.0.1', server_port=
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect((server_ip, server_port))
-             # Send purpose identifier for registration
+            # Send purpose identifier for registration
             registration_data = f"REGISTER\n{username},{ip},{port}"
             print(f"Sending registration data: {registration_data.encode()}")
             sock.sendall(registration_data.encode())  # Send the actual registration data next
@@ -63,7 +61,7 @@ def register_with_server(username, ip, port, server_ip='127.0.0.1', server_port=
     except Exception as e:
         print(f"Error registering with server: {e}")
         return False
-    
+
 def get_peer_address(peer_username, server_ip='127.0.0.1', server_port=5500):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
