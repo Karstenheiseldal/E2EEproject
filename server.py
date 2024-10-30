@@ -8,7 +8,6 @@ def handle_registration(data, client_socket):
         print(f"Received registration data: {data}")
 
         data_parts = data.split(',')
-        
         if len(data_parts) == 3:
             username, ip, port = data_parts[0], data_parts[1], int(data_parts[2])
             clients[username] = (ip, port)
@@ -49,8 +48,6 @@ def handle_queries(data, client_socket):
     finally:
         client_socket.close()
 
-
-
 def handle_client(client_socket):
     try:
         # Receive the purpose and data in one message, split by newline
@@ -83,6 +80,3 @@ def start_server(host='0.0.0.0', port=5500):
 
 if __name__ == "__main__":
     start_server()
-
-
-
