@@ -52,7 +52,7 @@ class ConnectionRefusedError(Exception):
     """Exception raised when a P2P connection is refused."""
     pass
 
-# Peer-to-peer server that listens for a connection
+# Peer-to-peer server that listens for a connection. A new socket therefore have to be made.
 def p2p_server(host, port, peer_username, parameters):
     client = DiffieHellmanClient(parameters=parameters)
     try:
@@ -90,12 +90,11 @@ def p2p_server(host, port, peer_username, parameters):
         print(f"Error in P2P server: {e}")
 
 #This is the client connecting to a peer listening at their port
-def p2p_client(peer_ip, peer_port, peer_username, parameters):
+def p2p_client( peer_ip, peer_port, peer_username, parameters):
     client = DiffieHellmanClient(parameters=parameters)
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-            client_socket.connect((peer_ip, peer_port))
-            print(f"Connected to peer at {peer_ip}:{peer_port}")
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket: #Creates a new socket for p2p comunication as a client
+            client_socket.connect((peer_ip, peer_port)) #Attempting to connect with the peer server.
 
             # Receive and handle the server peer's public key
             server_public_key_message = client_socket.recv(2048).decode()
@@ -131,7 +130,7 @@ def p2p_client(peer_ip, peer_port, peer_username, parameters):
 # Attempt to connect to a peer, and if unsuccessful, act as a server and wait for a connection
 def connect_to_peer_or_wait(username, peer_username, ip, port, shared_parameters):
     """Attempt to connect to the peer as client; if unavailable, switch to server mode and wait."""
-    peer_address = get_peer_address(peer_username, '127.0.0.1', 5500)
+    peer_address = get_peer_address(peer_username, '127.0.0.1', 5501)
     
     if peer_address:
         peer_ip, peer_port = peer_address
@@ -139,10 +138,9 @@ def connect_to_peer_or_wait(username, peer_username, ip, port, shared_parameters
         print(f"{username} will first try to act as the client and connect to {peer_username}.")
         
         try:
-            # Attempt to connect as the client
+            # Pass shared_parameters when calling p2p_client
             p2p_client(peer_ip, peer_port, peer_username, shared_parameters)
         except ConnectionRefusedError:
-            # Switch to server mode if connection was refused
             print(f"Switching {username} to server mode to wait for {peer_username} to connect.")
             p2p_server(ip, port, peer_username, shared_parameters)
         except Exception as e:
@@ -185,13 +183,13 @@ def main_menu(username, ip, port, shared_parameters):
 def start_client():
     try:
         username = input("Enter your username: ")
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         ip = '127.0.0.1'
+        client_socket.connect((ip, 5501))
+        port = client_socket.getsockname()[1]
         
-        # Automatically assigned port for P2P server
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as temp_socket:
-            temp_socket.bind((ip, 0))
-            port = temp_socket.getsockname()[1]
-
+        print(port)
+        
         # Load or generate shared DH parameters
         try:
             shared_parameters = load_dh_parameters()
@@ -201,6 +199,8 @@ def start_client():
             save_dh_parameters(shared_parameters)
             print("Generated and saved new DH parameters.")
 
+        print(client_socket.getsockname())
+
         # Register the client with the server
         if not register_with_server(username, ip, port):
             print("Failed to register with the registry server. Exiting...")
@@ -208,6 +208,7 @@ def start_client():
 
         # Start the main menu
         main_menu(username, ip, port, shared_parameters)
+        client_socket.close()
 
     except Exception as e:
         print(f"Error in client operation: {e}")

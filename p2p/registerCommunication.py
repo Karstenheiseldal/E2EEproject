@@ -1,6 +1,6 @@
 import socket
 
-def list_registered_clients(server_ip='127.0.0.1', server_port=5500):
+def list_registered_clients(server_ip='127.0.0.1', server_port=5501):
     """Request and return the list of registered clients from the server."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -13,7 +13,7 @@ def list_registered_clients(server_ip='127.0.0.1', server_port=5500):
         return []
     
     # Register client with the registry server
-def register_with_server(username, ip, port, server_ip='127.0.0.1', server_port=5500):
+def register_with_server(username, ip, port, server_ip='127.0.0.1', server_port=5501):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect((server_ip, server_port))
@@ -29,7 +29,7 @@ def register_with_server(username, ip, port, server_ip='127.0.0.1', server_port=
         print(f"Error registering with server: {e}")
         return False
     
-def get_peer_address(peer_username, server_ip='127.0.0.1', server_port=5500):
+def get_peer_address(peer_username, server_ip='127.0.0.1', server_port=5501):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect((server_ip, server_port))
