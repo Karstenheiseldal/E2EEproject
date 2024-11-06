@@ -100,6 +100,13 @@ class TestDiffieHellmanClient(unittest.TestCase):
 
     def test_invalid_query(self):
         """Test handling an invalid query."""
+        username = "test_user"
+        ip = "127.0.0.1"
+        port = 12345
+        registration_message = f"REGISTER\n{username},{ip},{port}"
+        self.client_socket.sendall(registration_message.encode())
+        time.sleep(2)
+        self.client_socket.recv(1024)  # Consume the registration response
         invalid_query_message = "QUERY\nINVALID_COMMAND"
         self.client_socket.sendall(invalid_query_message.encode())
         
@@ -107,7 +114,7 @@ class TestDiffieHellmanClient(unittest.TestCase):
         time.sleep(2)
         
         response = self.client_socket.recv(1024).decode()
-        self.assertEqual(response, "Unknown connection purpose.")
+        self.assertEqual(response, "Unknown Query")
         
     '''def test_single_user_connection(self):
         """Test if one client can connect to the server."""
