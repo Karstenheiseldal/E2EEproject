@@ -65,6 +65,8 @@ def handle_queries(data, client_socket):
             else:
                 print(f"Peer {peer_username} not found")
                 client_socket.send(b"Peer not found")
+        else:
+            client_socket.send(b"Unknown Query")
     except Exception as e:
         print(f"Error during query handling: {e}")
 
