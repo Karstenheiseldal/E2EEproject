@@ -22,7 +22,7 @@ def listen_for_shutdown(server_socket):
 
 clients_lock = threading.Lock()
 
-def handle_registration(data, client_socket):
+def handle_registration(data, client_socket : socket.socket):
     try:
         print(f"Received registration data: {data}")
 
@@ -32,16 +32,16 @@ def handle_registration(data, client_socket):
             with clients_lock:  # Use lock to ensure thread safety
                 clients[username] = (ip, port)
             print(f"Registered {username} at {ip}:{port}")
-            client_socket.send(b"Registration successful")
+            client_socket.sendall(b"Registration successful")
         else:
-            client_socket.send(b"Invalid registration data")
+            client_socket.sendall(b"Invalid registration data")
     except Exception as e:
         print(f"Error during registration: {e}")
 
-def handle_queries(data, client_socket):
+def handle_queries(data, client_socket : socket.socket):
     try:
         if shutdown_flag:
-            client_socket.send(b"Server is shutting down.")
+            client_socket.sendall(b"Server is shutting down.")
             return
         
         query = data.strip()
@@ -51,7 +51,7 @@ def handle_queries(data, client_socket):
             # Send a list of usernames currently registered
             client_list = ','.join(clients.keys())
             print(f"Sending list of registered clients: {client_list}")
-            client_socket.send(client_list.encode())
+            client_socket.sendall(client_list.encode())
 
         elif query.startswith("GET_PEER"):
             peer_username = query.split(' ')[1]
@@ -61,12 +61,15 @@ def handle_queries(data, client_socket):
                 peer_ip, peer_port = clients[peer_username]
                 response = f"{peer_ip},{peer_port}"
                 print(f"Sending peer address: {response}")
-                client_socket.send(response.encode())
+                client_socket.sendall(response.encode())
             else:
                 print(f"Peer {peer_username} not found")
-                client_socket.send(b"Peer not found")
+                client_socket.sendall(b"Peer not found")
+        elif query.startswith("REMOVE_USER"): # Removing user from the clients array after it exits
+            username = query.split(' ')[1]
+            del clients[username]
         else:
-            client_socket.send(b"Unknown Query")
+            client_socket.sendall(b"Unknown Query")
     except Exception as e:
         print(f"Error during query handling: {e}")
 

@@ -122,7 +122,7 @@ def p2p_client( peer_ip, peer_port, peer_username, parameters):
                 print("Expected public key but received something else.")
     except OSError as e:
         if e.errno == 10061:
-               raise ConnectionRefusedError(f"Connection to {peer_username} was refused.")
+            raise ConnectionRefusedError(f"Connection to {peer_username} was refused.")
         else:
             print(f"Error in P2P client: {e}")
 
@@ -148,7 +148,7 @@ def connect_to_peer_or_wait(username, peer_username, ip, port, shared_parameters
     else:
         print(f"User {peer_username} is offline or unavailable.")
 
-def main_menu(username, ip, port, shared_parameters):
+def main_menu(username, ip, port, shared_parameters, client_socket : socket.socket):
     """Main menu allowing the user to list clients or initiate a chat."""
     while True:
         print("\nOptions:")
@@ -172,9 +172,10 @@ def main_menu(username, ip, port, shared_parameters):
                 connect_to_peer_or_wait(username, peer_username, ip, port, shared_parameters)
             else:
                 print("Invalid username or you cannot chat with yourself.")
-        
+
         elif choice == '3':
             print("Exiting...")
+            client_socket.sendall(f"QUERY\nREMOVE_USER {username}".encode())
             break
         else:
             print("Invalid choice. Please enter 1, 2, or 3.")
@@ -207,7 +208,7 @@ def start_client():
             return
 
         # Start the main menu
-        main_menu(username, ip, port, shared_parameters)
+        main_menu(username, ip, port, shared_parameters, client_socket)
         client_socket.close()
 
     except Exception as e:
