@@ -6,7 +6,6 @@ import unittest
 
 from Register.server import shutdown_flag, start_server
 
-
 class TestDiffieHellmanClient(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -18,26 +17,16 @@ class TestDiffieHellmanClient(unittest.TestCase):
         time.sleep(2)  # Allow more time for the server to start
 
     def setUp(self):
-        """Set up client sockets for each test."""
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect(('127.0.0.1', 5501))
-
-        self.client_socket_2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket_2.connect(('127.0.0.1', 5501))
-    
-    def tearDown(self):
-        """Close the client sockets after each test."""
-        self.client_socket.close()
-        self.client_socket_2.close()
+        self.ip = "127.0.0.1"
+        self.port = 5501
 
     def test_registration(self):
         """Test client registration with the server."""
         username = "test_user"
-        ip = "127.0.0.1"
-        port = 12345
-
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect((self.ip, self.port))
         # Send registration data
-        registration_message = f"REGISTER\n{username},{ip},{port}"
+        registration_message = f"REGISTER\n{username},{self.ip},{self.port}"
         self.client_socket.sendall(registration_message.encode())
         response = self.client_socket.recv(1024).decode()
 
@@ -47,22 +36,23 @@ class TestDiffieHellmanClient(unittest.TestCase):
         self.client_socket.sendall("QUERY\nLIST_CLIENTS".encode())
         response = self.client_socket.recv(1024).decode()
         self.assertIn(username, response)
+        self.client_socket.close()
 
     def test_list_clients(self):
         """Test querying the list of registered clients."""
         # Register a test user
         username = "test_user"
-        ip = "127.0.0.1"
-        port = 12345
-        registration_message = f"REGISTER\n{username},{ip},{port}"
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect((self.ip, self.port))
+        registration_message = f"REGISTER\n{username},{self.ip},{self.port}"
         self.client_socket.sendall(registration_message.encode())
         time.sleep(2)
         self.client_socket.recv(1024)  # Consume the registration response
 
         username2 = "test_user2"
-        ip = "127.0.0.1"
-        port2 = 12348
-        registration_message2 = f"REGISTER\n{username2},{ip},{port2}"
+        self.client_socket_2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket_2.connect((self.ip, self.port))
+        registration_message2 = f"REGISTER\n{username2},{self.ip},{self.port}"
         self.client_socket_2.sendall(registration_message2.encode())
         time.sleep(2)
         self.client_socket_2.recv(1024)
@@ -78,13 +68,16 @@ class TestDiffieHellmanClient(unittest.TestCase):
         self.assertIn(username, response)
         self.assertIn(username2, response)
 
+        self.client_socket.close()
+        self.client_socket_2.close()
+
     def test_get_peer_address(self):
         """Test retrieving a peer's address."""
         # Register user
         username = "test_user34"
-        ip = "127.0.0.1"
-        port = 12345
-        registration_message = f"REGISTER\n{username},{ip},{port}"
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect((self.ip, self.port))
+        registration_message = f"REGISTER\n{username},{self.ip},{self.port}"
         self.client_socket.sendall(registration_message.encode())
         self.client_socket.recv(1024)  # Consume the registration response
 
@@ -96,15 +89,16 @@ class TestDiffieHellmanClient(unittest.TestCase):
         self.client_socket.sendall(peer_query_message.encode())
         response = self.client_socket.recv(1024).decode()
 
-        expected_response = f"{ip},{port}"
+        expected_response = f"{self.ip},{self.port}"
         self.assertEqual(response, expected_response)
+        self.client_socket.close()
 
     def test_invalid_query(self):
         """Test handling an invalid query."""
         username = "test_user"
-        ip = "127.0.0.1"
-        port = 12345
-        registration_message = f"REGISTER\n{username},{ip},{port}"
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect((self.ip, self.port))
+        registration_message = f"REGISTER\n{username},{self.ip},{self.port}"
         self.client_socket.sendall(registration_message.encode())
         time.sleep(2)
         self.client_socket.recv(1024)  # Consume the registration response
@@ -114,13 +108,46 @@ class TestDiffieHellmanClient(unittest.TestCase):
         time.sleep(2)
         response = self.client_socket.recv(1024).decode()
         self.assertEqual(response, "Unknown Query")
+        self.client_socket.close()
+
+    def test_remove_user(self):
+        """Test the remove_user query"""
+        # User1 connects
+        username = "test_user"
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect((self.ip, self.port))
+        registration_message = f"REGISTER\n{username},{self.ip},{self.port}"
+        self.client_socket.sendall(registration_message.encode())
+        time.sleep(2)
+        # User2 connects
+        username2 = "test_user2"
+        self.client_socket_2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket_2.connect((self.ip, self.port))
+        registration_message = f"REGISTER\n{username2},{self.ip},{self.port}"
+        self.client_socket_2.sendall(registration_message.encode())
+        # This is needed for the "Registration is successful message"
+        self.client_socket_2.recv(1024)  # Consume the registration response
+        self.client_socket.recv(1024)
+        time.sleep(2)
+        # First List query, it should be "test_user1, test_user2"
+        self.client_socket.sendall("QUERY\nLIST_CLIENTS".encode())
+        response = self.client_socket.recv(1024).decode()
+        self.assertEqual(2, len(response.split(',')))
+        # Removing the first user (username)
+        self.client_socket.sendall(f"QUERY\nREMOVE_USER {username}".encode())
+        time.sleep(1)
+        # User2 does a list query, it should be only "test_user2", so there shouldn'T be a ',' in the response
+        self.client_socket_2.sendall("QUERY\nLIST_CLIENTS".encode())
+        response = self.client_socket_2.recv(1024).decode()
+        self.assertNotIn(',', response)
+        self.client_socket.close()
+        self.client_socket_2.close()
 
     @classmethod
     def tearDownClass(cls):
         """Shutdown the server after tests."""
         global shutdown_flag
         shutdown_flag = True
-        
 
 if __name__ == '__main__':
     unittest.main()
