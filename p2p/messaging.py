@@ -1,7 +1,8 @@
-import threading
 import socket
+import threading
 
 from registerCommunication import list_registered_clients
+
 
 def message_sender(client_socket : socket.socket):
     """Continuously sends messages to the peer."""
@@ -12,6 +13,7 @@ def message_sender(client_socket : socket.socket):
             client_socket.sendall("MSG:Peer has left the chat.".encode())
             client_socket.close()
             break
+        # TODO: Do we need this? For connection we need to break the current session. The only purpose of this could be to show the users of the current session.
         elif message.lower() == '!getusers':
             # Request the user list from the registry server without disrupting the main chat
             registered_clients = list_registered_clients()
