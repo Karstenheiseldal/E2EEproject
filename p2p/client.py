@@ -1,13 +1,11 @@
 import socket
-import threading
-import time
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-
-from registerCommunication import list_registered_clients, register_with_server, get_peer_address
 from messaging import start_messaging
+from registerCommunication import (get_peer_address, list_registered_clients, register_with_server)
+
 
 def save_dh_parameters(parameters, filename="dh_parameters.pem"):
     """Save DH parameters to a file."""

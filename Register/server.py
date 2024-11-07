@@ -1,16 +1,15 @@
+import os
 import socket
 import threading
-import os
 
 clients = {}  # Dictionary to store client addresses {username: (ip, port)}
 shutdown_flag = False
 
-def listen_for_shutdown(server_socket):
+def listen_for_shutdown(server_socket : socket.socket):
     global shutdown_flag
     if os.getenv("TEST_MODE") == "1":
         # Skip listening for shutdown in test mode
         return
-    
     while True:
         command = input("Type 'shutdown' to stop the server: ")
         if command.lower() == 'shutdown':
@@ -25,7 +24,6 @@ clients_lock = threading.Lock()
 def handle_registration(data, client_socket : socket.socket):
     try:
         print(f"Received registration data: {data}")
-
         data_parts = data.split(',')
         if len(data_parts) == 3:
             username, ip, port = data_parts[0], data_parts[1], int(data_parts[2])
@@ -43,7 +41,6 @@ def handle_queries(data, client_socket : socket.socket):
         if shutdown_flag:
             client_socket.sendall(b"Server is shutting down.")
             return
-        
         query = data.strip()
         print(f"Received query: '{query}'")
 
@@ -79,7 +76,6 @@ def handle_client(client_socket : socket.socket):
             client_socket.sendall(b"Server is shutting down.")
             client_socket.close()
             return
-        
         while True:  # Keep the connection open for multiple requests
             message = client_socket.recv(1024).decode().strip()
             if not message:  # If no message is received, break the loop
@@ -108,7 +104,6 @@ def start_server(host='127.0.0.1', port=5501):  #Changed port
             server_socket.bind((host, port))
             server_socket.listen(5)
             print(f"Server listening on {host}:{port}")
-            
             # Start the shutdown listener thread
             shutdown_thread = threading.Thread(target=listen_for_shutdown, args=(server_socket,))
             shutdown_thread.start()
