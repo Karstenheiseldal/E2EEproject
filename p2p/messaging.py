@@ -1,8 +1,9 @@
 import threading
+import socket
 
 from registerCommunication import list_registered_clients
 
-def message_sender(client_socket):
+def message_sender(client_socket : socket.socket):
     """Continuously sends messages to the peer."""
     while True:
         message = input("You: ")
@@ -11,8 +12,6 @@ def message_sender(client_socket):
             client_socket.sendall("MSG:Peer has left the chat.".encode())
             client_socket.close()
             break
-        
-        
         elif message.lower() == '!getusers':
             # Request the user list from the registry server without disrupting the main chat
             registered_clients = list_registered_clients()
