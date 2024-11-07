@@ -73,10 +73,10 @@ def handle_queries(data, client_socket : socket.socket):
     except Exception as e:
         print(f"Error during query handling: {e}")
 
-def handle_client(client_socket):
+def handle_client(client_socket : socket.socket):
     try:
         if shutdown_flag:
-            client_socket.send(b"Server is shutting down.")
+            client_socket.sendall(b"Server is shutting down.")
             client_socket.close()
             return
         
@@ -94,7 +94,7 @@ def handle_client(client_socket):
                 handle_queries(data, client_socket)
             else:
                 print("Unknown connection purpose.")
-                client_socket.send(b"Unknown connection purpose.")
+                client_socket.sendall(b"Unknown connection purpose.")
     except Exception as e:
         print(f"Error in handle_client: {e}")
     finally:
