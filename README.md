@@ -27,15 +27,15 @@ NB Remember to have Python in PATH and pip installed
 For the sake of sanity, and so much more, lets keep these naming conventions when we are coding.
 
 1. **Variables**
-   - Use camelCase for all variable names.
-   - Example: `userCount`, `totalPrice`, `maxHeight`
+   - Use snake_case for all variable names.
+   - Example: `user_count`, `total_price`, `max_height`
 
 2. **Functions and Methods**
-   - Use camelCase for function and method names.
-   - Example: `calculateTotal()`, `sendMessage()`, `updateUserStatus()`
+   - Use snake_case for function and method names.
+   - Example: `calculate_total()`, `send_message()`, `update_user_status()`
 
 3. **Classes**
-   - Use PascalCase for class names (first letter of each word capitalized).
+   - Use CamelCase for class names (first letter of each word capitalized).
    - Example: `UserProfile`, `DataProcessor`, `EncryptionService`
 
 4. **Constants**
@@ -46,20 +46,16 @@ For the sake of sanity, and so much more, lets keep these naming conventions whe
    - Use camelCase for file names, keeping them descriptive and concise.
    - Example: `userProfile.js`, `dataProcessor.py`, `encryptionService.cs`
 
-6. **Interfaces (if applicable)**
-   - Use PascalCase with a prefix like "I" for interfaces (if applicable).
-   - Example: `IUser`, `IDataProcessor`
+6. **Modules and Packages**
+   - Use lowercase for module and package names, with underscores.
+   - Example: `user_profile`, `data_processor`, `encryption_service`
 
-7. **Modules and Packages**
-   - Use lowercase for module and package names, with no underscores or hyphens.
-   - Example: `userprofile`, `dataprocessor`, `encryptionservice`
+7. **Global Variables**
+   - Avoid using global variables. If necessary, use snake_case with a clear, descriptive name.
+   - Example: `global_settings`, `shared_data`
 
-8. **Global Variables (if applicable)**
-   - Avoid using global variables. If necessary, use camelCase with a clear, descriptive name.
-   - Example: `globalSettings`, `sharedData`
-
-9. **Test Methods**
-   - Use Snake Case prefixed with `test_` for test method names.
+8. **Test Methods**
+   - Use snake_case prefixed with `test` for test method names.
    - Example: `test_user_login()`, `test_encryption_process()`
 
 
