@@ -12,6 +12,12 @@ def signup_user(username, password, ip, port):
 
 def login_user(username, password, ip, port):
       ref = db.reference(f"users/{username}")
-      ref.set({"password": password, "ip": ip, "port": port})
       user_data = ref.get()
+      if user_data is not None and user_data["password"] == password:
+            ref.set({"password": password, "ip": ip, "port": port})
       return user_data is not None and user_data["password"] == password
+
+def get_users():
+      users_ref = db.reference("users")
+      if users_ref is not None:
+            return users_ref.get()

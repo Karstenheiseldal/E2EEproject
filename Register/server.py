@@ -3,7 +3,7 @@ import socket
 import threading
 
 import firebase_admin
-from authentication import login_user, signup_user
+from firebase_functions import login_user, signup_user, get_users
 from firebase_admin import credentials
 
 clients = {}  # Dictionary to store client addresses {username: (ip, port)}
@@ -25,21 +25,6 @@ def listen_for_shutdown(server_socket : socket.socket):
 
 clients_lock = threading.Lock()
 
-def handle_registration(data, client_socket : socket.socket):
-    try:
-        print(f"Received registration data: {data}")
-        data_parts = data.split(',')
-        if len(data_parts) == 3:
-            username, ip, port = data_parts[0], data_parts[1], int(data_parts[2])
-            with clients_lock:  # Use lock to ensure thread safety
-                clients[username] = (ip, port)
-            print(f"Registered {username} at {ip}:{port}")
-            client_socket.sendall(b"Registration successful")
-        else:
-            client_socket.sendall(b"Invalid registration data")
-    except Exception as e:
-        print(f"Error during registration: {e}")
-
 def handle_queries(data, client_socket : socket.socket):
     try:
         if shutdown_flag:
@@ -50,9 +35,10 @@ def handle_queries(data, client_socket : socket.socket):
 
         if query == "LIST_CLIENTS":
             # Send a list of usernames currently registered
-            client_list = ','.join(clients.keys())
-            print(f"Sending list of registered clients: {client_list}")
-            client_socket.sendall(client_list.encode())
+            users = get_users()
+            # client_list = ','.join(clients.keys())
+            print(f"Sending list of registered clients: {users}")
+            client_socket.sendall(users)
 
         elif query.startswith("GET_PEER"):
             peer_username = query.split(' ')[1]
@@ -89,21 +75,13 @@ def handle_client(client_socket : socket.socket):
             print(f"Connection purpose: {purpose}")
 
             if purpose == "REGISTER":
-                data = data.split(',')
-                username = data[0]
-                password = data[1]
-                ip = data[2]
-                port = data[3]
+                username, password, ip, port = data.split(',')
                 if signup_user(username, password, ip, port):
                     client_socket.sendall(b"Successful registration")
                 else:
                     client_socket.sendall(b"Failed to register")
             elif purpose == "LOGIN":
-                data = data.split(',')
-                username = data[0]
-                password = data[1]
-                ip = data[2]
-                port = data[3]
+                username, password, ip, port = data.split(',')
                 if login_user(username, password, ip, port):
                     client_socket.sendall(b"Successful login")
                 else:

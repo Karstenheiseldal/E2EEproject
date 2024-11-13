@@ -158,7 +158,7 @@ def main_menu(ip, port, shared_parameters, client_socket : socket.socket, logged
 
             if choice == '1':
                 # Get and display a list of registered (online) users
-                registered_clients = list_registered_clients()
+                registered_clients = list_registered_clients(client_socket)
                 if registered_clients:
                     print("Online users:", ", ".join(registered_clients))
                 else:

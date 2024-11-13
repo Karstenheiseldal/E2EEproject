@@ -1,14 +1,14 @@
 import socket
 
 
-def list_registered_clients(server_ip='127.0.0.1', server_port=5501):
+def list_registered_clients(client_socket : socket.socket):
     """Request and return the list of registered clients from the server."""
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect((server_ip, server_port))
-            sock.sendall("QUERY\nLIST_CLIENTS".encode())
-            clients_list = sock.recv(1024).decode().strip()
-            return clients_list.split(',') if clients_list else []
+        client_socket.sendall("QUERY\nLIST_CLIENTS".encode())
+        clients_list = client_socket.recv(1024)
+        for user in clients_list:
+            print(user)
+        return clients_list.split(',') if clients_list else []
     except Exception as e:
         print(f"Error retrieving list of clients: {e}")
         return []
