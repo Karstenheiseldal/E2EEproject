@@ -92,7 +92,9 @@ def handle_client(client_socket : socket.socket):
                 data = data.split(',')
                 username = data[0]
                 password = data[1]
-                if signup_user(username, password):
+                ip = data[2]
+                port = data[3]
+                if signup_user(username, password, ip, port):
                     client_socket.sendall(b"Successful registration")
                 else:
                     client_socket.sendall(b"Failed to register")
