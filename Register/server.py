@@ -3,8 +3,8 @@ import socket
 import threading
 
 import firebase_admin
-from firebase_functions import login_user, signup_user, get_users
 from firebase_admin import credentials
+from firebase_functions import get_users, login_user, signup_user
 
 clients = {}  # Dictionary to store client addresses {username: (ip, port)}
 shutdown_flag = False
@@ -36,9 +36,8 @@ def handle_queries(data, client_socket : socket.socket):
         if query == "LIST_CLIENTS":
             # Send a list of usernames currently registered
             users = get_users()
-            # client_list = ','.join(clients.keys())
-            print(f"Sending list of registered clients: {users}")
-            client_socket.sendall(users)
+            users = ','.join(users)
+            client_socket.sendall(users.encode())
 
         elif query.startswith("GET_PEER"):
             peer_username = query.split(' ')[1]

@@ -151,7 +151,7 @@ def main_menu(ip, port, shared_parameters, client_socket : socket.socket, logged
     if logged_in:
         while True:
             print("\nOptions:")
-            print("1. List online users")
+            print("1. List registered users")
             print("2. Connect to a user")
             print("3. Exit")
             choice = input("Enter your choice: ")
@@ -160,7 +160,7 @@ def main_menu(ip, port, shared_parameters, client_socket : socket.socket, logged
                 # Get and display a list of registered (online) users
                 registered_clients = list_registered_clients(client_socket)
                 if registered_clients:
-                    print("Online users:", ", ".join(registered_clients))
+                    print(f"Registered Users: {registered_clients}")
                 else:
                     print("No users are online.")
 

@@ -5,10 +5,8 @@ def list_registered_clients(client_socket : socket.socket):
     """Request and return the list of registered clients from the server."""
     try:
         client_socket.sendall("QUERY\nLIST_CLIENTS".encode())
-        clients_list = client_socket.recv(1024)
-        for user in clients_list:
-            print(user)
-        return clients_list.split(',') if clients_list else []
+        clients_list = client_socket.recv(4096).decode()
+        return clients_list if clients_list else []
     except Exception as e:
         print(f"Error retrieving list of clients: {e}")
         return []
