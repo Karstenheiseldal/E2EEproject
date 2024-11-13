@@ -44,3 +44,6 @@ pip-log.txt
 pip-delete-this-directory.txt
 node_modules/
 dh_parameters.pem
+
+# Firebase
+firebase-adminsdk.json
