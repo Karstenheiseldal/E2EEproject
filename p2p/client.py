@@ -4,7 +4,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from messaging import start_messaging
-from registerCommunication import (get_peer_address, list_registered_clients, register_with_server)
+from registerCommunication import get_peer_address, list_registered_clients
 
 
 def save_dh_parameters(parameters, filename="dh_parameters.pem"):
@@ -146,50 +146,72 @@ def connect_to_peer_or_wait(username, peer_username, ip, port, shared_parameters
     else:
         print(f"User {peer_username} is offline or unavailable.")
 
-def main_menu(username, ip, port, shared_parameters, client_socket : socket.socket):
+def main_menu(ip, port, shared_parameters, client_socket : socket.socket, logged_in):
     """Main menu allowing the user to list clients or initiate a chat."""
-    while True:
-        print("\nOptions:")
-        print("1. List online users")
-        print("2. Connect to a user")
-        print("3. Exit")
-        choice = input("Enter your choice: ")
+    if logged_in:
+        while True:
+            print("\nOptions:")
+            print("1. List online users")
+            print("2. Connect to a user")
+            print("3. Exit")
+            choice = input("Enter your choice: ")
 
-        if choice == '1':
-            # Get and display a list of registered (online) users
-            registered_clients = list_registered_clients()
-            if registered_clients:
-                print("Online users:", ", ".join(registered_clients))
+            if choice == '1':
+                # Get and display a list of registered (online) users
+                registered_clients = list_registered_clients()
+                if registered_clients:
+                    print("Online users:", ", ".join(registered_clients))
+                else:
+                    print("No users are online.")
+
+            elif choice == '2':
+                # Allow the user to choose a peer and handle role-switching dynamically
+                peer_username = input("Enter the username of the person you want to chat with: ")
+                if peer_username and peer_username != username:
+                    connect_to_peer_or_wait(username, peer_username, ip, port, shared_parameters)
+                else:
+                    print("Invalid username or you cannot chat with yourself.")
+
+            elif choice == '3':
+                print("Exiting...")
+                client_socket.sendall(f"QUERY\nREMOVE_USER {username}".encode())
+                break
             else:
-                print("No users are online.")
-        
-        elif choice == '2':
-            # Allow the user to choose a peer and handle role-switching dynamically
-            peer_username = input("Enter the username of the person you want to chat with: ")
-            if peer_username and peer_username != username:
-                connect_to_peer_or_wait(username, peer_username, ip, port, shared_parameters)
-            else:
-                print("Invalid username or you cannot chat with yourself.")
+                print("Invalid choice. Please enter 1, 2, or 3.")
+    else:
+        while True:
+            print("\nOptions:")
+            print("1. Login")
+            print("2. Register")
+            print("3. Exit")
+            choice = input("Enter your choice: ")
+            if choice == '1':
+                username = input("Enter your username: ")
+                password = input("Enter your password: ")
+                login_data = f"LOGIN\n{username},{password},{ip},{port}"
+                client_socket.sendall(login_data.encode())
+                result = client_socket.recv(1024).decode()
+                if result == "Successful login":
+                    main_menu(ip, port, shared_parameters, client_socket, logged_in=True)
+                elif result == "Failed to login":
+                    print("Failed to login, please try again")
+            if choice == '2':
+                username = input("Enter your username: ")
+                password = input("Enter your password: ")
+                registration_data = f"REGISTER\n{username},{password},{ip},{port}"
+                client_socket.sendall(registration_data.encode())
+                result = client_socket.recv(1024).decode()
+                print(f"RESULT: {result}")
+                if result == "Successful registration":
+                    main_menu(ip, port, shared_parameters, client_socket, logged_in=True)
+                elif result == "Failed to register":
+                    print("Failed to register, please try again")
+            if choice == '3':
+                print("Exiting...")
+                client_socket.close()
+                break
 
-        elif choice == '3':
-            print("Exiting...")
-            client_socket.sendall(f"QUERY\nREMOVE_USER {username}".encode())
-            break
-        else:
-            print("Invalid choice. Please enter 1, 2, or 3.")
-
-# Main client starting function
-def start_client():
-    try:
-        username = input("Enter your username: ")
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        ip = '127.0.0.1'
-        client_socket.connect((ip, 5501))
-        port = client_socket.getsockname()[1]
-        
-        print(port)
-        
-        # Load or generate shared DH parameters
+def load_or_generate_shared_DH_parameters():
         try:
             shared_parameters = load_dh_parameters()
             print("Loaded existing DH parameters.")
@@ -197,16 +219,25 @@ def start_client():
             shared_parameters = dh.generate_parameters(generator=2, key_size=2048)
             save_dh_parameters(shared_parameters)
             print("Generated and saved new DH parameters.")
+            return shared_parameters
+        return shared_parameters
 
-        print(client_socket.getsockname())
+# Main client starting function
+def start_client():
+    try:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        ip = '127.0.0.1'
+        client_socket.connect((ip, 5501))
+        port = client_socket.getsockname()[1]
+        # Load or generate shared DH parameters
 
         # Register the client with the server
-        if not register_with_server(username, ip, port):
-            print("Failed to register with the registry server. Exiting...")
-            return
-
+        #if not register_with_server(username, ip, port):
+        #    print("Failed to register with the registry server. Exiting...")
+        #    return
+        shared_parameters = load_or_generate_shared_DH_parameters()
         # Start the main menu
-        main_menu(username, ip, port, shared_parameters, client_socket)
+        main_menu(ip, port, shared_parameters, client_socket, logged_in = False)
         client_socket.close()
 
     except Exception as e:

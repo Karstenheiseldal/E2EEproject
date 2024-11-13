@@ -2,6 +2,10 @@ import os
 import socket
 import threading
 
+import firebase_admin
+from authentication import login_user, signup_user
+from firebase_admin import credentials
+
 clients = {}  # Dictionary to store client addresses {username: (ip, port)}
 shutdown_flag = False
 
@@ -85,7 +89,23 @@ def handle_client(client_socket : socket.socket):
             print(f"Connection purpose: {purpose}")
 
             if purpose == "REGISTER":
-                handle_registration(data, client_socket)
+                data = data.split(',')
+                username = data[0]
+                password = data[1]
+                if signup_user(username, password):
+                    client_socket.sendall(b"Successful registration")
+                else:
+                    client_socket.sendall(b"Failed to register")
+            elif purpose == "LOGIN":
+                data = data.split(',')
+                username = data[0]
+                password = data[1]
+                ip = data[2]
+                port = data[3]
+                if login_user(username, password, ip, port):
+                    client_socket.sendall(b"Successful login")
+                else:
+                    client_socket.sendall(b"Failed to login")
             elif purpose == "QUERY":
                 handle_queries(data, client_socket)
             else:
@@ -121,4 +141,8 @@ def start_server(host='127.0.0.1', port=5501):  #Changed port
             print(f"Error starting server: {e}")
 
 if __name__ == "__main__":
+    cred = credentials.Certificate("./firebase-adminsdk.json")
+    firebase_admin.initialize_app(cred, {
+    "databaseURL": "https://advanced-project-25097-default-rtdb.europe-west1.firebasedatabase.app/:advanced_ruc_project"
+    })
     start_server()
