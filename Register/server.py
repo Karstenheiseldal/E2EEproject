@@ -6,7 +6,6 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_functions import get_users, login_user, signup_user
 
-clients = {}  # Dictionary to store client addresses {username: (ip, port)}
 shutdown_flag = False
 
 def listen_for_shutdown(server_socket : socket.socket):
@@ -42,18 +41,17 @@ def handle_queries(data, client_socket : socket.socket):
         elif query.startswith("GET_PEER"):
             peer_username = query.split(' ')[1]
             print(f"Client is requesting address for peer: {peer_username}")
-
-            if peer_username in clients:
-                peer_ip, peer_port = clients[peer_username]
+            users = get_users()
+            print(users)
+            print(users[peer_username].values())
+            if peer_username in users.keys():
+                peer_ip, password, peer_port = users[peer_username].values()
                 response = f"{peer_ip},{peer_port}"
                 print(f"Sending peer address: {response}")
                 client_socket.sendall(response.encode())
             else:
                 print(f"Peer {peer_username} not found")
                 client_socket.sendall(b"Peer not found")
-        elif query.startswith("REMOVE_USER"): # Removing user from the clients array after it exits
-            username = query.split(' ')[1]
-            del clients[username]
         else:
             client_socket.sendall(b"Unknown Query")
     except Exception as e:
