@@ -4,7 +4,9 @@ import threading
 
 import firebase_admin
 from firebase_admin import credentials
-from firebase_functions import get_users, login_user, signup_user
+from firebase_functions import get_users, login_user, signup_user, fetch_key, fetch_and_decrypt_message, send_encrypted_message
+from security.doubleratchet import initialize_session
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 
 shutdown_flag = False
 
@@ -83,6 +85,23 @@ def handle_client(client_socket : socket.socket):
                     client_socket.sendall(b"Successful login")
                 else:
                     client_socket.sendall(b"Failed to login")
+            elif purpose == "INIT_SESSION":
+                sender_private_key = X25519PrivateKey.generate()
+                sender, receiver = data.split(",")
+                receiver_keys = fetch_key(receiver)
+                session_state = initialize_session(sender_private_key, {
+                    "identity_key": X25519PublicKey.from_public_bytes(receiver_keys["identity_key"]),
+                    "signed_pre_key": X25519PublicKey.from_public_bytes(receiver_keys["signed_pre_key"]),
+                    })
+                client_socket.sendall(f"Session initialized with {receiver}".encode())
+            elif purpose == "SEND_MESSAGE":
+                sender, receiver, plaintext = data.split(",", 2)
+                send_encrypted_message(sender, receiver, plaintext, session_state)
+                client_socket.sendall(b"Message sent")
+            elif purpose == "FETCH_MESSAGE":
+                username = data.strip()
+                fetch_and_decrypt_message(username, session_state)
+                client_socket.sendall(b"Messages fetched and processed")
             elif purpose == "QUERY":
                 handle_queries(data, client_socket)
             else:

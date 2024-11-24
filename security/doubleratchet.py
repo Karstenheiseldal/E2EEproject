@@ -8,13 +8,21 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 # from Crypto.Cipher import AES
 
-def kdf(key, info, length=32):
+def kdf(chain_key, length=32):
     return HKDF(
         algorithm = hashes.SHA256(),
         length = length,
         salt = None,
-        info=info
-    ).derive(key)
+        info=b"chain_key_derivation",
+    ).derive(chain_key)
+
+def initialize_session(sender_private_key, receiver_key_bundle):
+      dh1 = sender_private_key.exchange(receiver_key_bundle["identity_key"])
+      dh2 = sender_private_key.exchange(receiver_key_bundle["signed_pre_key"])
+
+      shared_key = dh1 + dh2
+      root_key = kdf(shared_key, b"root_key")
+      return root_key
 
 # encryption of plain text using AES-GCM
 def encrypt(key, plaintext):
@@ -30,5 +38,4 @@ def decrypt(key, ciphertext):
     cipher = Cipher(algorithms.AES(key), modes.GCM(iv, tag))
     decryptor = cipher.decryptor()
     return decryptor.update(ciphertext[12:-16]) + decryptor.finalize()
-
                                                              

@@ -5,6 +5,8 @@ import time
 import unittest
 
 from Register.server import shutdown_flag, start_server
+from security.doubleratchet import kdf, initialize_session
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 
 class TestDiffieHellmanClient(unittest.TestCase):
     @classmethod
@@ -110,11 +112,49 @@ class TestDiffieHellmanClient(unittest.TestCase):
         self.assertEqual(response, "Unknown Query")
         self.client_socket.close()
 
+
     @classmethod
     def tearDownClass(cls):
         """Shutdown the server after tests."""
         global shutdown_flag
         shutdown_flag = True
+
+class TestSessionInitialization(unittest.TestCase):
+    def setUp(self):
+        self.alice_identity_private = X25519PrivateKey.generate()
+        self.alice_identity_public = self.alice_identity_private.public_key()
+
+        self.bob_identity_private = X25519PrivateKey.generate()
+        self.bob_identity_public = self.bob_identity_private.public_key()
+
+        self.bob_signed_prekey_private = X25519PrivateKey.generate()
+        self.bob_signed_prekey_public = self.bob_signed_prekey_private.public_key()
+
+        self.bob_prekey_bundle = {
+            "identity_key": self.bob_identity_public.public_bytes(self.bob_prekey_bundle["identity_key"]),
+            "signed_pre_key": self.bob_signed_prekey_public.public_bytes(self.bob_prekey_bundle["signed_pre_key"])
+        }
+
+    def test_session_initialize(self):
+        alice_session_state = initialize_session(
+            self.alice_identity_private, {
+                "identity_key": X25519PublicKey.from_public_bytes(self.bob_prekey_bundle["identity_key"]),
+                "signed_pre_key": X25519PublicKey.from_public_bytes(self.bob_prekey_bundle["signed_pre_key"]),
+            }
+        )
+
+        bob_session_state = initialize_session(
+            self.bob_identity_private,
+            {
+                "identity_key": self.alice_identity_public,
+                "signed_pre_key": self.alice_identity_public
+            }
+        )
+
+        # validate derived root and chain key
+        self.assertEqual(alice_session_state["root_key"])
+        self.assertEqual(bob_session_state["chain_key"])
+
 
 if __name__ == '__main__':
     unittest.main()
