@@ -3,12 +3,13 @@ import socket
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import dh
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
 from p2p.messaging import start_messaging
 from p2p.registerCommunication import get_peer_address, list_registered_clients
-from security.ratchet import Ratchet
+from security.doubleRatchet import DoubleRatchet
+
 
 def save_dh_parameters(parameters, filename="dh_parameters.pem"):
-    """Save DH parameters to a file."""
     with open(filename, "wb") as f:
         f.write(parameters.parameter_bytes(
             encoding=serialization.Encoding.PEM,
@@ -16,11 +17,10 @@ def save_dh_parameters(parameters, filename="dh_parameters.pem"):
         ))
 
 def load_dh_parameters(filename="dh_parameters.pem"):
-    """Load DH parameters from a file."""
     with open(filename, "rb") as f:
         return serialization.load_pem_parameters(f.read())
 
-class DiffieHellmanClient:
+class Client:
     def __init__(self, parameters=None):
         # Use shared parameters if provided, otherwise generate new ones
         self.parameters = parameters if parameters else dh.generate_parameters(generator=2, key_size=2048)
@@ -52,7 +52,7 @@ class ConnectionRefusedError(Exception):
 
 # Peer-to-peer server that listens for a connection. A new socket therefore have to be made.
 def p2p_server(host, port, peer_username, parameters):
-    client = DiffieHellmanClient(parameters=parameters)
+    client = Client(parameters=parameters)
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
             server_socket.bind((host, port))
@@ -70,17 +70,13 @@ def p2p_server(host, port, peer_username, parameters):
                 if peer_public_key_message.startswith("KEY:"):
                     peer_public_key_bytes = peer_public_key_message[4:].encode()
                     peer_public_key = client.deserialize_public_key(peer_public_key_bytes)
-                    shared_secret = client.derive_shared_secret(client.private_key, peer_public_key)
-                    print(f"Shared secret with {peer_username}: {shared_secret.hex()}")
-                    ratchet = Ratchet(shared_secret, client.private_key)
-                    ratchet.dh_ratchet(peer_public_key)
-                    print("After LOL")
+                    diffie_hellman_ratchet = DoubleRatchet(parameters, client.private_key, peer_public_key)
                     # Send key exchange completion
                     conn.sendall("KEY_EXCHANGE_DONE".encode())
                     confirmation = conn.recv(1024).decode()
                     if confirmation == "KEY_EXCHANGE_DONE":
                         print("Key exchange completed successfully. Starting chat.")
-                        start_messaging(conn, peer_username, ratchet)
+                        start_messaging(conn, peer_username, diffie_hellman_ratchet)
                     else:
                         print("Failed to confirm key exchange.")
                 else:
@@ -90,7 +86,7 @@ def p2p_server(host, port, peer_username, parameters):
 
 #This is the client connecting to a peer listening at their port
 def p2p_client( peer_ip, peer_port, peer_username, parameters):
-    client = DiffieHellmanClient(parameters=parameters)
+    client = Client(parameters=parameters)
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket: #Creates a new socket for p2p comunication as a client
             client_socket.connect((peer_ip, peer_port)) #Attempting to connect with the peer server.
@@ -100,22 +96,18 @@ def p2p_client( peer_ip, peer_port, peer_username, parameters):
             if server_public_key_message.startswith("KEY:"):
                 server_public_key_bytes = server_public_key_message[4:].encode()
                 peer_public_key = client.deserialize_public_key(server_public_key_bytes)
-                shared_secret = client.derive_shared_secret(client.private_key, peer_public_key)
-                print(f"Shared secret with {peer_username}: {shared_secret.hex()}")
-
                 # Send the client's public key with a "KEY:" prefix
                 serialized_public_key = client.serialize_public_key()
                 client_socket.sendall(f"KEY:{serialized_public_key.decode()}".encode())
 
                 # Send key exchange completion
                 client_socket.sendall("KEY_EXCHANGE_DONE".encode())
-                ratchet = Ratchet(shared_secret, client.private_key)
-                ratchet.dh_ratchet(peer_public_key)
+                diffie_hellman_ratchet = DoubleRatchet(parameters, client.private_key, peer_public_key)
                 # Wait for confirmation to proceed to messaging
                 confirmation = client_socket.recv(1024).decode()
                 if confirmation == "KEY_EXCHANGE_DONE":
-                    print("Key exchange completed successfully. Starting chat.")
-                    start_messaging(client_socket, peer_username, ratchet)
+                    print("Starting chat.")
+                    start_messaging(client_socket, peer_username, diffie_hellman_ratchet)
                 else:
                     print("Failed to confirm key exchange.")
             else:
@@ -198,7 +190,6 @@ def main_menu(ip, port, shared_parameters, client_socket : socket.socket, logged
                 registration_data = f"REGISTER\n{username},{password},{ip},{port}"
                 client_socket.sendall(registration_data.encode())
                 result = client_socket.recv(1024).decode()
-                print(f"RESULT: {result}")
                 if result == "Successful registration":
                     main_menu(ip, port, shared_parameters, client_socket, logged_in=True, username=username)
                 elif result == "Failed to register":

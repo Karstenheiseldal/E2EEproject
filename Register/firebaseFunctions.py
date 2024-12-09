@@ -1,12 +1,10 @@
 from firebase_admin import db
 
 
-# Functions to interact with Firebase
 def signup_user(username, password, ip, port):
       ref = db.reference("users")
-      # Username already exists
       if ref.child(username).get() is not None:
-            return False  # Username already exists
+            return False
       ref.child(username).set({"password": password, "ip": ip, "port": port})
       return True
 

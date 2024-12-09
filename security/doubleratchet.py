@@ -1,55 +1,104 @@
 import os
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey, Ed25519PrivateKey
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.backends import default_backend
+
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-# from Crypto.Cipher import AES
 
-def kdf(chain_key, length=32):
-    return HKDF(
-        algorithm = hashes.SHA256(),
-        length = length,
-        salt = None,
-        info=b"chain_key_derivation",
-    ).derive(chain_key)
+class DoubleRatchet:
+      def __init__(self, parameters, local_private_key = None, peer_public_key = None):
+            self.parameters = parameters
+            self.local_private_key = local_private_key or self.parameters.generate_private_key()
+            self.local_public_key = self.local_private_key.public_key()
+            self.peer_public_key = peer_public_key
+            self.root_key = self._derive_shared_secret() # For initialization we only use the shared secret as the root_key
+            self.sending_chain_key = None
+            self.receiving_chain_key = None
+            self.is_first_message = True
+            self.session_length = 3
 
-def initialize_session(sender_private_key, receiver_key_bundle):
-    dh1 = sender_private_key.exchange(receiver_key_bundle["identity_key"])
-    dh2 = sender_private_key.exchange(receiver_key_bundle["signed_pre_key"])
+      def _derive_shared_secret(self):
+            shared_secret = self.local_private_key.exchange(self.peer_public_key)
+            root_key = HKDF(
+                  algorithm=hashes.SHA256(),
+                  length=64,
+                  salt=None,
+                  info=b""
+            ).derive(shared_secret)
+            return root_key[:32]
+      def _derive_key_with_shared_secret(self, key):
+            shared_secret = self.local_private_key.exchange(self.peer_public_key)
+            kdf_output = HKDF(
+                  algorithm=hashes.SHA256(),
+                  length=64,
+                  salt=None,
+                  info=b""
+            ).derive(key + shared_secret)
+            self.root_key = kdf_output[:32]
+            return kdf_output[32:]
+      def ratchet_step(self, peer_public_key):
+            if self.peer_public_key != peer_public_key:
+                  self.peer_public_key = peer_public_key
+                  self.receiving_chain_key = self._derive_key_with_shared_secret(self.root_key)
+                  self.sending_chain_key = None
+                  self.session_length = 3
+      def update_symmetric_ratchet_sending_chain(self):
+            if self.sending_chain_key is None:
+                  self.sending_chain_key = self._derive_key_with_shared_secret(self.root_key)
+            kdf_output = HKDF(
+                  algorithm=hashes.SHA256(),
+                  length=64,
+                  salt=None,
+                  info=b""
+            ).derive(self.sending_chain_key)
+            self.sending_chain_key = kdf_output[32:]
+            message_key = kdf_output[:32]
+            return message_key
+      def update_symmetric_ratchet_receiving_chain(self):
+            if self.receiving_chain_key is None:
+                  self.receiving_chain_key = self._derive_key_with_shared_secret(self.root_key)
+            kdf_output = HKDF(
+                  algorithm=hashes.SHA256(),
+                  length=64,
+                  salt=None,
+                  info=b""
+            ).derive(self.receiving_chain_key)
+            self.receiving_chain_key = kdf_output[32:]
+            message_key = kdf_output[:32]
+            return message_key
+      def serialize_public_key(self):
+            return self.local_public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+      def deserialize_public_key(self, peer_public_key_bytes):
+            return serialization.load_pem_public_key(peer_public_key_bytes)
+      def check_and_update_keys(self):
+            if self.session_length == 0:
+                  self.local_private_key = self.parameters.generate_private_key()
+                  self.local_public_key = self.local_private_key.public_key()
+                  self.sending_chain_key = self._derive_key_with_shared_secret(self.root_key)
+                  self.receiving_chain_key = None
+                  self.session_length = 3
+            else:
+                  self.session_length = self.session_length - 1
 
-    shared_key = dh1 + dh2
-    root_key = kdf(shared_key, b"root_key")
-    return root_key
-
-# encryption of plain text using AES-GCM
 def encrypt(key, plaintext):
-    print(f"Key in encryptor: {key}")
-    iv = os.urandom(12)
-    cipher = Cipher(algorithms.AES(key), modes.GCM(iv))
-    encryptor = cipher.encryptor()
-    print("before cipher")
-    ciphertext = encryptor.update(plaintext) + encryptor.finalize()
-    print("After cipher")
-    print(f"IV: {iv}, CipherText: {ciphertext}, Encryptor.tag: {encryptor.tag}")
-    print(f"Result: {iv + ciphertext + encryptor.tag}")
-    return iv + ciphertext + encryptor.tag
+      try:
+            iv = os.urandom(12)
+            cipher = Cipher(algorithms.AES(key), modes.GCM(iv))
+            encryptor = cipher.encryptor()
+            ciphertext = encryptor.update(plaintext) + encryptor.finalize()
+            return iv + ciphertext + encryptor.tag
+      except Exception as e:
+            print(f"Error at encrypting message: {e}")
 
 def decrypt(key, ciphertext):
-    try:
-        print(f"Key in decryptor: {key}")
-        print("Decrypt?")
-        iv = ciphertext[:12]
-        print("Decrypt2?")
-        tag = ciphertext[-16:]
-        print("Decrypt3?")
-        cipher = Cipher(algorithms.AES(key), modes.GCM(iv, tag))
-        print("Decrypt4?")
-        decryptor = cipher.decryptor()
-        print("Decrypt5?")
-        print(f"Ciphertext in decryptor: {ciphertext}")
-        return decryptor.update(ciphertext[12:-16]) + decryptor.finalize()
-    except Exception as e:
-        print(f"Error at decrypting: {e}")
+      try:
+            iv = ciphertext[:12]
+            tag = ciphertext[-16:]
+            cipher = Cipher(algorithms.AES(key), modes.GCM(iv, tag))
+            decryptor = cipher.decryptor()
+            return decryptor.update(ciphertext[12:-16]) + decryptor.finalize()
+      except Exception as e:
+            print(f"Error at decrypting message: {e}")

@@ -18,64 +18,52 @@ NB Remember to have Python in PATH and pip installed
    cd to the project's directory
    Create a .venv / use your own interpreter
    pip install -r path/to/requirements.txt
-   First start the server:
-   python server.py
-   Then start 1 or more clients:
-   python client.py
+   First start the server from root:
+   python -m register.server
+   Then start the clients from root:
+   python -m p2p.client
 ```
 ## Naming Conventions
 For the sake of sanity, and so much more, lets keep these naming conventions when we are coding.
 
 1. **Variables**
    - Use snake_case for all variable names.
-   - Example: `user_count`, `total_price`, `max_height`
+   - Example: `public_key`, `private_key`, `shared_secret`
 
 2. **Functions and Methods**
    - Use snake_case for function and method names.
-   - Example: `calculate_total()`, `send_message()`, `update_user_status()`
+   - Example: `serialize_public_key()`, `deserialize_public_key()`, `update_symmetric_ratchet_receiving_chain()`
 
 3. **Classes**
    - Use CamelCase for class names (first letter of each word capitalized).
-   - Example: `UserProfile`, `DataProcessor`, `EncryptionService`
+   - Example: `DoubleRatchet`, `DataProcessor`, `Client`
 
 4. **Constants**
    - Use ALL_CAPS with underscores to separate words for constants.
-   - Example: `MAX_CONNECTIONS`, `DEFAULT_TIMEOUT`, `API_KEY`
+   - Example: `MAX_CONNECTIONS`, `DEFAULT_TIMEOUT`
 
 5. **File Names**
    - Use camelCase for file names, keeping them descriptive and concise.
-   - Example: `userProfile.js`, `dataProcessor.py`, `encryptionService.cs`
+   - Example: `doubleRatchet.py`, `registerCommunication.py`, `firebaseFunctions.py`
 
-6. **Modules and Packages**
-   - Use lowercase for module and package names, with underscores.
-   - Example: `user_profile`, `data_processor`, `encryption_service`
-
-7. **Global Variables**
-   - Avoid using global variables. If necessary, use snake_case with a clear, descriptive name.
-   - Example: `global_settings`, `shared_data`
-
-8. **Test Methods**
+6. **Test Methods**
    - Use snake_case prefixed with `test` for test method names.
    - Example: `test_user_login()`, `test_encryption_process()`
 
 
- ## Requirements
+## Requirements
 **End-to-End Encryption (E2EE):** Ensure only clients can decrypt messages, protecting the content from the server and other unauthorized access.
 
 **AES-128 Encryption for Messages:** Secure message contents using AES-128 encryption, where encryption keys are shared exclusively between communicating clients.
 
-**Signal Protocol:** Implement the Signal Protocol to enable asynchronous and secure messaging, supporting robust encryption and communication between online and offline clients.
+**Signal Protocol:** Implement the Signal Protocol to enable asynchronous and secure messaging, supporting robust encryption and communication between online clients.
 
-**Double Ratchet Algorithm:** Use the Double Ratchet algorithm to rotate encryption keys with each message, maintaining forward secrecy and integrity across all interactions.
+**Double Ratchet Algorithm:** Use the Double Ratchet algorithm to rotate encryption keys with each (or more) message, maintaining forward secrecy and integrity across all interactions.
 
-**Diffie-Hellman Key Exchange:** Use the standard Diffie-Hellman key exchange to establish shared encryption keys over the network securely, ensuring confidentiality during the initial handshake.
-
-(Optional) **Secure Group Chat Support:** Extend encryption capabilities to include group chats, allowing multiple clients to securely exchange messages within a single, private conversation.
+**Diffie-Hellman Key Exchange:** Use the standard Diffie-Hellman key exchange to establish shared encryption over the network securely, ensuring confidentiality during the initial handshake.
 
 **Perfect Forward Secrecy (PFS):** Guarantee that each session uses unique encryption keys, so past communications remain secure even if future keys are compromised.
 
-**User Authentication with RSA:** Use RSA for user identity verification, establishing trust between clients during initial connections and prior to setting up encrypted sessions.
-
-**Command-Line Interface (CLI):** Build a clear, user-friendly CLI for both client and server interactions, enabling users to connect, send messages, and view chat history in the terminal.
+**Command-Line Interface (CLI):** Build a clear, user-friendly CLI for both client and server interactions, enabling users to connect, send messages in the terminal.
 
 **Server-Facilitated Communication:** Have the server handle client connections and message routing while enforcing E2EE, ensuring it cannot access message content directly.
