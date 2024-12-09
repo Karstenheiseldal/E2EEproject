@@ -4,7 +4,8 @@ import threading
 
 import firebase_admin
 from firebase_admin import credentials
-from firebase_functions import get_users, login_user, signup_user
+
+from register.firebaseFunctions import get_users, login_user, signup_user
 
 shutdown_flag = False
 
@@ -30,7 +31,6 @@ def handle_queries(data, client_socket : socket.socket):
             client_socket.sendall(b"Server is shutting down.")
             return
         query = data.strip()
-        print(f"Received query: '{query}'")
 
         if query == "LIST_CLIENTS":
             # Send a list of usernames currently registered
@@ -42,8 +42,6 @@ def handle_queries(data, client_socket : socket.socket):
             peer_username = query.split(' ')[1]
             print(f"Client is requesting address for peer: {peer_username}")
             users = get_users()
-            print(users)
-            print(users[peer_username].values())
             if peer_username in users.keys():
                 peer_ip, password, peer_port = users[peer_username].values()
                 response = f"{peer_ip},{peer_port}"

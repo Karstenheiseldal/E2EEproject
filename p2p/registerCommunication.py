@@ -2,7 +2,6 @@ import socket
 
 
 def list_registered_clients(client_socket : socket.socket):
-    """Request and return the list of registered clients from the server."""
     try:
         client_socket.sendall("QUERY\nLIST_CLIENTS".encode())
         clients_list = client_socket.recv(4096).decode()
@@ -28,4 +27,3 @@ def get_peer_address(peer_username, client_socket : socket.socket):
         return ip, int(port)  # Return the peer's IP and port
     except Exception as e:
         print(f"Error retrieving peer address: {e}")
-        return None
